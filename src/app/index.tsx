@@ -1,98 +1,522 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { runOnJS } from 'react-native-worklets';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BuildModal } from '@/components/build-modal';
+import { FacilityDetailModal, type DetailRow } from '@/components/facility-detail-modal';
+import { PhaseResourceBar } from '@/components/phase-resource-bar';
+import { ResearchModal } from '@/components/research-modal';
+import { ResultModal } from '@/components/result-modal';
+import { StartOverlay } from '@/components/start-overlay';
+import { TimerBar } from '@/components/timer-bar';
+import { Colors, Spacing } from '@/constants/theme';
+import {
+  BUILD_DURATION_MS,
+  DEMOLISH_DURATION_MS,
+  RESEARCH_DURATION_MS,
+  buildFacility,
+  demolishFacility,
+  getAdjacentIndices,
+  getFacilityDisplayName,
+  startResearch,
+  tickFacilities,
+} from '@/domain/facility-actions';
+import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
+import { createGame } from '@/domain/game';
+import type { ResearchCatalogEntry } from '@/domain/research-catalog';
+import { getAvailableFacilityKeys, getUnlockedPhases } from '@/domain/research-unlock';
+import type { FacilityId, Game, PlotIndex, ResearchId, ResourcePhase } from '@/domain/types';
+import { useGameLoop } from '@/hooks/use-game-loop';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+const SESSION_DURATION_MS = 360_000;
+const INITIAL_FUNDS = 1_000;
+const SWIPE_THRESHOLD = 40;
+
+export default function GameScreen() {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
+
+  const [game, setGame] = useState<Game>(() =>
+    createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS }),
   );
-}
 
-export default function HomeScreen() {
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const gameStarted = startedAt !== null;
+
+  const gameFinished = game.status === 'finished';
+
+  const [now, setNow] = useState(() => Date.now());
+  useGameLoop((currentNow) => {
+    setNow(currentNow);
+    setGame((g) => tickFacilities(g, currentNow));
+  }, gameStarted && !gameFinished);
+
+  const remaining =
+    startedAt !== null
+      ? Math.max(0, game.sessionDurationMs - (now - startedAt))
+      : game.sessionDurationMs;
+
+  // 残り時間が 0 になったらゲーム終了
+  useEffect(() => {
+    if (!gameStarted || gameFinished) return;
+    if (remaining === 0) {
+      setGame((g) => ({
+        ...g,
+        status: 'finished',
+        score: Math.floor(g.player.funds + g.player.totalFundsSpent),
+      }));
+    }
+  }, [remaining, gameStarted, gameFinished]);
+
+  // ── プロットナビゲーション ────────────────────────────────────
+  const [selectedPlotIndex, setSelectedPlotIndex] = useState<PlotIndex>(4);
+  // ワークレット内から参照するための shared value
+  const currentIndexSv = useSharedValue<number>(4);
+
+  const unlockedPhases = useMemo(
+    () => getUnlockedPhases(game.player.completedResearch),
+    [game.player.completedResearch],
+  );
+
+  const availableFacilityKeys = useMemo(
+    () => getAvailableFacilityKeys(game.player.completedResearch),
+    [game.player.completedResearch],
+  );
+
+  const { phaseTotals, phaseCurrents, phaseUnlocked } = useMemo(() => {
+    const totals: Record<ResourcePhase, number> = { 1: 0, 2: 0, 3: 0 };
+    const currents: Record<ResourcePhase, number> = { 1: 0, 2: 0, 3: 0 };
+    const unlocked: Record<ResourcePhase, boolean> = { 1: false, 2: false, 3: false };
+    for (const deposit of game.plots[selectedPlotIndex].deposits) {
+      if (unlockedPhases.has(deposit.phase)) {
+        totals[deposit.phase] =
+          Math.round((totals[deposit.phase] + deposit.abundance) * 100) / 100;
+        currents[deposit.phase] =
+          Math.round((currents[deposit.phase] + deposit.current) * 100) / 100;
+        unlocked[deposit.phase] = true;
+      }
+    }
+    return { phaseTotals: totals, phaseCurrents: currents, phaseUnlocked: unlocked };
+  }, [game.plots, selectedPlotIndex, unlockedPhases]);
+
+  const navigateTo = useCallback((index: number) => {
+    setSelectedPlotIndex(index as PlotIndex);
+  }, []);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan().onEnd((e) => {
+        'worklet';
+        const absX = Math.abs(e.translationX);
+        const absY = Math.abs(e.translationY);
+        if (Math.max(absX, absY) < SWIPE_THRESHOLD) return;
+
+        // ドラッグした方向の逆にあるplotへ移動（マップパン的な感覚）
+        // 右ドラッグ → 左のplotを表示、下ドラッグ → 上のplotを表示
+        const current = currentIndexSv.value;
+        const row = Math.floor(current / 3);
+        const col = current % 3;
+
+        let next = current;
+        if (absX > absY) {
+          if (e.translationX > 0 && col > 0) next = current - 1; // 右ドラッグ → 左へ
+          else if (e.translationX < 0 && col < 2) next = current + 1; // 左ドラッグ → 右へ
+        } else {
+          if (e.translationY > 0 && row > 0) next = current - 3; // 下ドラッグ → 上へ
+          else if (e.translationY < 0 && row < 2) next = current + 3; // 上ドラッグ → 下へ
+        }
+
+        if (next !== current) {
+          currentIndexSv.value = next;
+          runOnJS(navigateTo)(next);
+        }
+      }),
+    [currentIndexSv, navigateTo],
+  );
+
+  const handleStart = useCallback(() => {
+    setStartedAt(Date.now());
+    setNow(Date.now());
+  }, []);
+
+  const handleRestart = useCallback(() => {
+    setGame(createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS }));
+    setStartedAt(null);
+    setNow(Date.now());
+    setSelectedPlotIndex(4);
+    currentIndexSv.value = 4;
+  }, [currentIndexSv]);
+
+  const [buildModalVisible, setBuildModalVisible] = useState(false);
+  const [facilityDetailVisible, setFacilityDetailVisible] = useState(false);
+  const [labModalVisible, setLabModalVisible] = useState(false);
+  const [labFacilityId, setLabFacilityId] = useState<FacilityId | null>(null);
+
+  // 現在選択中の plot の施設（なければ undefined）
+  const currentFacility = useMemo(() => {
+    const facilityId = game.plots[selectedPlotIndex].facilityId;
+    return facilityId ? game.facilities.get(facilityId) : undefined;
+  }, [game.plots, game.facilities, selectedPlotIndex]);
+
+  const facilityDetailRows = useMemo((): DetailRow[] => {
+    if (!currentFacility || currentFacility.state !== 'idle') return [];
+
+    if (currentFacility.kind === 'extractor') {
+      const keyMap: Record<string, ResearchId> = {
+        agriculture: 'agri-efficiency' as ResearchId,
+        mineral:     'mineral-efficiency' as ResearchId,
+        energy:      'energy-efficiency' as ResearchId,
+      };
+      const level = game.player.completedResearch.get(keyMap[currentFacility.resourceType]) ?? 0;
+      const multiplier = Math.pow(1.2, level);
+      return [
+        { label: '研究レベル',     value: `Lv.${level}` },
+        { label: '採掘倍率',       value: `×${multiplier.toFixed(2)}` },
+        { label: '採掘量/サイクル', value: (currentFacility.outputPerCycle * multiplier).toFixed(2) },
+        { label: 'サイクル間隔',   value: `${currentFacility.cycleDurationMs / 1000} 秒` },
+      ];
+    }
+
+    if (currentFacility.kind === 'refinery') {
+      const adjIndices = getAdjacentIndices(currentFacility.plotIndex);
+      const activeCount = adjIndices.filter((idx) => {
+        const fid = game.plots[idx].facilityId;
+        if (!fid) return false;
+        const f = game.facilities.get(fid);
+        return f?.kind === 'extractor' && f.state === 'idle';
+      }).length;
+      const researchLevel = game.player.completedResearch.get('refinery-efficiency' as ResearchId) ?? 0;
+      const effectiveMultiplier = currentFacility.valueMultiplier * Math.pow(1.2, researchLevel);
+      return [
+        { label: '有効マス',       value: `${activeCount} / ${adjIndices.length}` },
+        { label: '精製研究レベル', value: `Lv.${researchLevel}` },
+        { label: '価値増加倍率',   value: `×${effectiveMultiplier.toFixed(2)}` },
+      ];
+    }
+
+    return [];
+  }, [currentFacility, game.player.completedResearch, game.plots, game.facilities]);
+
+  const handleFacilityTap = useCallback(() => {
+    if (!currentFacility) return;
+    if (currentFacility.kind === 'laboratory') {
+      if (currentFacility.state === 'idle') {
+        setLabFacilityId(currentFacility.id);
+        setLabModalVisible(true);
+      }
+      // processing 中は何もしない（メイン画面のプログレスバーで確認可能）
+    } else if (
+      currentFacility.state === 'idle' &&
+      (currentFacility.kind === 'extractor' || currentFacility.kind === 'refinery')
+    ) {
+      setFacilityDetailVisible(true);
+    }
+  }, [currentFacility]);
+
+  // ゲームループで currentFacility が毎フレーム更新されても
+  // tapGesture を再生成しないよう ref 経由で最新の関数を保持する
+  const handleFacilityTapRef = useRef(handleFacilityTap);
+  handleFacilityTapRef.current = handleFacilityTap;
+  const stableFacilityTap = useCallback(() => handleFacilityTapRef.current(), []);
+
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap().onEnd(() => {
+        'worklet';
+        runOnJS(stableFacilityTap)();
+      }),
+    [stableFacilityTap],
+  );
+
+  const composedGesture = useMemo(
+    () => Gesture.Race(tapGesture, panGesture),
+    [tapGesture, panGesture],
+  );
+
+  const handleBuild = useCallback((entry: FacilityCatalogEntry) => {
+    setGame((g) => buildFacility(g, selectedPlotIndex, entry, Date.now()));
+  }, [selectedPlotIndex]);
+
+  const handleDemolish = useCallback(() => {
+    setGame((g) => demolishFacility(g, selectedPlotIndex, Date.now()));
+  }, [selectedPlotIndex]);
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* 残り時間 */}
+      <TimerBar remaining={remaining} sessionDurationMs={game.sessionDurationMs} />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+      {/* フェーズ別資源バー */}
+      <View style={styles.phaseBarsRow}>
+        {([1, 2, 3] as const).map((phase) => (
+          <PhaseResourceBar
+            key={phase}
+            phase={phase}
+            unlocked={phaseUnlocked[phase]}
+            total={phaseTotals[phase]}
+            current={phaseCurrents[phase]}
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        ))}
+      </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      {/* プロットマップ */}
+      <GestureDetector gesture={composedGesture}>
+        <View style={[styles.plotMap, { backgroundColor: colors.backgroundElement }]}>
+          <Text style={[styles.plotMapLabel, { color: colors.textSecondary }]}>
+            Plot #{selectedPlotIndex}
+          </Text>
+          {/* 3×3 ミニマップ インジケーター */}
+          <View style={styles.miniMap}>
+            {([0, 1, 2, 3, 4, 5, 6, 7, 8] as const).map((i) => (
+              <View
+                key={i}
+                style={[
+                  styles.miniMapCell,
+                  {
+                    backgroundColor:
+                      i === selectedPlotIndex ? colors.text : colors.backgroundSelected,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+          {/* 施設情報 */}
+          {currentFacility ? (
+            <View style={styles.facilityInfo}>
+              <Text style={[styles.facilityName, { color: colors.text }]}>
+                {getFacilityDisplayName(currentFacility)}
+                {'  '}
+                <Text style={{ color: colors.textSecondary }}>
+                  {currentFacility.state === 'constructing' && '建設中'}
+                  {currentFacility.state === 'demolishing' && '破壊中'}
+                  {currentFacility.state === 'idle' && '稼働中'}
+                  {currentFacility.state === 'processing' && '処理中'}
+                </Text>
+              </Text>
+              {currentFacility.currentJob && (() => {
+                const durationMs =
+                  currentFacility.state === 'constructing' ? BUILD_DURATION_MS :
+                  currentFacility.state === 'processing'   ? RESEARCH_DURATION_MS :
+                  DEMOLISH_DURATION_MS;
+                const ratio = Math.min(
+                  1,
+                  (now - currentFacility.currentJob.startedAt) / durationMs,
+                );
+                const isDemolish = currentFacility.state === 'demolishing';
+                return (
+                  <View style={styles.facilityProgress}>
+                    <View style={[styles.facilityProgressTrack, { backgroundColor: colors.backgroundSelected }]}>
+                      <View
+                        style={[
+                          styles.facilityProgressFill,
+                          {
+                            width: `${ratio * 100}%`,
+                            backgroundColor: isDemolish ? '#F44336' : '#4CAF50',
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.facilityProgressLabel, { color: colors.textSecondary }]}>
+                      {Math.round(ratio * 100)}%
+                    </Text>
+                  </View>
+                );
+              })()}
+            </View>
+          ) : (
+            <Text style={[styles.facilityName, { color: colors.backgroundSelected }]}>施設なし</Text>
+          )}
+        </View>
+      </GestureDetector>
+
+      {/* 下部操作バー */}
+      <View style={styles.bottomBar}>
+        <View style={styles.actionButtons}>
+          {(() => {
+            const buildDisabled = !gameStarted || currentFacility !== undefined;
+            const demolishDisabled =
+              !gameStarted ||
+              !currentFacility ||
+              currentFacility.state === 'constructing' ||
+              currentFacility.state === 'demolishing';
+            return (
+              <>
+                <Pressable
+                  disabled={buildDisabled}
+                  style={({ pressed }) => [
+                    styles.button,
+                    {
+                      backgroundColor: pressed ? colors.backgroundSelected : colors.backgroundElement,
+                      opacity: buildDisabled ? 0.4 : 1,
+                    },
+                  ]}
+                  onPress={() => setBuildModalVisible(true)}
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>建設</Text>
+                </Pressable>
+                <Pressable
+                  disabled={demolishDisabled}
+                  style={({ pressed }) => [
+                    styles.button,
+                    {
+                      backgroundColor: pressed ? colors.backgroundSelected : colors.backgroundElement,
+                      opacity: demolishDisabled ? 0.4 : 1,
+                    },
+                  ]}
+                  onPress={handleDemolish}
+                >
+                  <Text style={[styles.buttonText, { color: colors.text }]}>破壊</Text>
+                </Pressable>
+              </>
+            );
+          })()}
+        </View>
+        <View style={styles.fundsDisplay}>
+          <Text style={[styles.fundsLabel, { color: colors.textSecondary }]}>資金</Text>
+          <Text style={[styles.fundsValue, { color: colors.text }]}>
+            {Math.floor(game.player.funds).toLocaleString()}
+          </Text>
+        </View>
+      </View>
+      {/* 建設モーダル */}
+      <BuildModal
+        visible={buildModalVisible}
+        onClose={() => setBuildModalVisible(false)}
+        onBuild={handleBuild}
+        availableFacilityKeys={availableFacilityKeys}
+        funds={game.player.funds}
+      />
+      {/* 施設詳細モーダル（Extractor / Refinery） */}
+      <FacilityDetailModal
+        visible={facilityDetailVisible}
+        onClose={() => setFacilityDetailVisible(false)}
+        title={currentFacility ? getFacilityDisplayName(currentFacility) : ''}
+        rows={facilityDetailRows}
+      />
+      {/* 研究モーダル（Laboratory からのみ開く） */}
+      <ResearchModal
+        visible={labModalVisible}
+        onClose={() => setLabModalVisible(false)}
+        completedResearch={game.player.completedResearch}
+        funds={game.player.funds}
+        onResearch={(entry: ResearchCatalogEntry) => {
+          if (!labFacilityId) return;
+          setGame((g) => startResearch(g, labFacilityId, entry, Date.now()));
+        }}
+      />
+      {/* ゲームスタートオーバーレイ（スワイプは背後のGestureDetectorへ通過） */}
+      {!gameStarted && <StartOverlay onStart={handleStart} />}
+      {/* リザルトモーダル */}
+      <ResultModal
+        visible={gameFinished}
+        score={game.score}
+        currentFunds={game.player.funds}
+        totalFundsSpent={game.player.totalFundsSpent}
+        onRestart={handleRestart}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.two,
+  },
+  // フェーズ別資源バー
+  phaseBarsRow: {
     flexDirection: 'row',
+    gap: Spacing.two,
   },
-  safeArea: {
+  // プロットマップ
+  plotMap: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
+    borderRadius: Spacing.two,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    gap: Spacing.three,
   },
-  title: {
+  plotMapLabel: {
+    fontSize: 20,
+  },
+  miniMap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: 72,
+    gap: 4,
+  },
+  miniMapCell: {
+    width: 20,
+    height: 20,
+    borderRadius: 3,
+  },
+  // 下部操作バー
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: Spacing.two,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  button: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
+  },
+  buttonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  fundsDisplay: {
+    alignItems: 'flex-end',
+  },
+  fundsLabel: {
+    fontSize: 11,
+  },
+  fundsValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  // 施設情報
+  facilityInfo: {
+    alignItems: 'center',
+    gap: Spacing.one,
+    width: '100%',
+    paddingHorizontal: Spacing.three,
+  },
+  facilityName: {
+    fontSize: 14,
+    fontWeight: '600',
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
+  facilityProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    width: '100%',
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  facilityProgressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  facilityProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  facilityProgressLabel: {
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    width: 32,
+    textAlign: 'right',
   },
 });
