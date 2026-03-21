@@ -67,7 +67,7 @@ export default function GameScreen() {
       setGame((g) => ({
         ...g,
         status: 'finished',
-        score: (() => { const b = computeScore(g); return b.resourcesMined + b.researchSpent; })(),
+        score: (() => { const b = computeScore(g); return b.resourcesMined + b.researchSpent + b.monumentBonus; })(),
       }));
     }
   }, [remaining, gameStarted, gameFinished]);
@@ -416,6 +416,7 @@ export default function GameScreen() {
         score={game.score}
         totalResourcesMined={computeScore(game).resourcesMined}
         totalResearchSpent={computeScore(game).researchSpent}
+        monumentBonus={computeScore(game).monumentBonus}
         onRestart={handleRestart}
       />
     </SafeAreaView>

@@ -10,6 +10,8 @@ export type FacilityCatalogEntry = {
   description: string;
   buildCost: number;
   demolishCost: number;
+  /** 建設時間（ms）。未指定なら BUILD_DURATION_MS を使用 */
+  buildDurationMs?: number;
   /** 建設に必要な研究カタログキー。未指定なら初期から建設可能 */
   requiredResearchKey?: string;
 };
@@ -64,5 +66,15 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "新技術の研究を進める施設。複数建設すると研究を並列化・加速できる。長期戦略に不可欠。",
     buildCost: 500,
     demolishCost: 120,
+  },
+  {
+    key: "monument",
+    kind: "monument",
+    name: "繁栄の象徴",
+    description:
+      "島の繁栄を示す巨大な建造物。建設に多大なコストと時間を要するが、その完成はスコアに大きく貢献する。",
+    buildCost: 3000,
+    demolishCost: 0,
+    buildDurationMs: 40_000,
   },
 ] as const;

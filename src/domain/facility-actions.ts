@@ -2,7 +2,7 @@ import type { FacilityCatalogEntry } from './facility-catalog';
 import { FACILITY_CATALOG } from './facility-catalog';
 import { newFacilityId } from './id';
 import { RESEARCH_CATALOG, type ResearchCatalogEntry } from './research-catalog';
-import type { Extractor, Facility, FacilityId, Game, Laboratory, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
+import type { Extractor, Facility, FacilityId, Game, Laboratory, Monument, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
 
 export const BUILD_DURATION_MS = 20_000;
 export const DEMOLISH_DURATION_MS = 10_000;
@@ -145,7 +145,7 @@ export function buildFacility(
     buildCost: entry.buildCost,
     demolishCost: entry.demolishCost,
     state: 'constructing' as const,
-    currentJob: { startedAt: now, durationMs: BUILD_DURATION_MS },
+    currentJob: { startedAt: now, durationMs: entry.buildDurationMs ?? BUILD_DURATION_MS },
   };
 
   let facility: Facility;
@@ -168,6 +168,9 @@ export function buildFacility(
       break;
     case 'booster':
       facility = { ...base, kind: 'booster', efficiencyBonus: 0.2, affectedIndices: [] };
+      break;
+    case 'monument':
+      facility = { ...base, kind: 'monument' } as Monument;
       break;
   }
 
@@ -318,7 +321,7 @@ export function tickFacilities(game: Game, now: number): Game {
  * - resourcesMined: 全plotの (abundance - current) の合計（採掘した資源量）
  * - researchSpent:  完了した研究に実際に支払ったコストの合計
  */
-export function computeScore(game: Game): { resourcesMined: number; researchSpent: number } {
+export function computeScore(game: Game): { resourcesMined: number; researchSpent: number; monumentBonus: number } {
   let resourcesMined = 0;
   for (const plot of game.plots) {
     for (const deposit of plot.deposits) {
@@ -336,8 +339,13 @@ export function computeScore(game: Game): { resourcesMined: number; researchSpen
     }
   }
 
+  const monumentBonus = [...game.facilities.values()].filter(
+    (f) => f.kind === 'monument' && f.state === 'idle',
+  ).length * 5000;
+
   return {
     resourcesMined: Math.floor(resourcesMined),
     researchSpent,
+    monumentBonus,
   };
 }

@@ -8,10 +8,11 @@ type Props = {
   score: number;
   totalResourcesMined: number;
   totalResearchSpent: number;
+  monumentBonus: number;
   onRestart: () => void;
 };
 
-export function ResultModal({ visible, score, totalResourcesMined, totalResearchSpent, onRestart }: Props) {
+export function ResultModal({ visible, score, totalResourcesMined, totalResearchSpent, monumentBonus, onRestart }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -41,6 +42,14 @@ export function ResultModal({ visible, score, totalResourcesMined, totalResearch
                 {totalResearchSpent.toLocaleString()} pt
               </Text>
             </View>
+            {monumentBonus > 0 && (
+              <View style={styles.breakdownRow}>
+                <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>繁栄の象徴</Text>
+                <Text style={[styles.breakdownValue, { color: colors.text }]}>
+                  {monumentBonus.toLocaleString()} pt
+                </Text>
+              </View>
+            )}
           </View>
 
           <Pressable

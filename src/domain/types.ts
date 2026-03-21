@@ -75,7 +75,12 @@ export type Booster = FacilityBase & {
   affectedIndices: PlotIndex[];
 };
 
-export type Facility = Extractor | Refinery | Laboratory | Booster;
+// Monument: 特殊な建造物（高コスト・長時間建設）
+export type Monument = FacilityBase & {
+  kind: "monument";
+};
+
+export type Facility = Extractor | Refinery | Laboratory | Booster | Monument;
 
 // ── Research Effect（研究の効果）─────────────────────────────────
 export type ResearchEffect =
