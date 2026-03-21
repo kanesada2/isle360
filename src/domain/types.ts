@@ -108,7 +108,6 @@ export type ResearchJob = {
 export type Player = {
   id:                 PlayerId;
   funds:              number;
-  totalFundsSpent:    number;  // ゲーム開始からの累計支出
   completedResearch:  Map<ResearchId, number>;  // researchId → 到達レベル
   activeResearchJobs: ResearchJob[];            // 並列研究（ラボ複数時）
 };

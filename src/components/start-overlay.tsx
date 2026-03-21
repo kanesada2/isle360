@@ -17,9 +17,9 @@ export function StartOverlay({ onStart }: Props) {
         <Text style={[styles.title, { color: colors.text }]}>Island 360</Text>
         <Text style={[styles.description, { color: colors.textSecondary }]}>
           360秒間で9マスのマップを開拓し尽くせ！{'\n'}
-          資源の埋蔵量に応じて施設の建設・破壊を繰り返し、獲得資金を最大化しよう。{'\n'}
-          効率よく稼ぐためには研究所での研究がカギ。{'\n'}
-          スワイプしてマップを確認し、準備ができたらスタートしてください
+          資源の埋蔵量を確認しながら採集施設を建造し、どんどん資金を稼ごう。{'\n'}
+          スコアを稼ぐためには研究所での研究がカギ。{'\n'}
+          スワイプしてマップを確認し、準備ができたらスタートしてください。
         </Text>
         <Pressable
           style={({ pressed }) => [

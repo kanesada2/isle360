@@ -6,12 +6,12 @@ import { Colors, Spacing } from '@/constants/theme';
 type Props = {
   visible: boolean;
   score: number;
-  currentFunds: number;
-  totalFundsSpent: number;
+  totalResourcesMined: number;
+  totalResearchSpent: number;
   onRestart: () => void;
 };
 
-export function ResultModal({ visible, score, currentFunds, totalFundsSpent, onRestart }: Props) {
+export function ResultModal({ visible, score, totalResourcesMined, totalResearchSpent, onRestart }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -24,21 +24,21 @@ export function ResultModal({ visible, score, currentFunds, totalFundsSpent, onR
           <View style={[styles.scoreBox, { backgroundColor: colors.background }]}>
             <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>スコア</Text>
             <Text style={[styles.scoreValue, { color: colors.text }]}>
-              {score.toLocaleString()} G
+              {score.toLocaleString()} pt
             </Text>
           </View>
 
           <View style={[styles.breakdown, { borderTopColor: colors.backgroundSelected }]}>
             <View style={styles.breakdownRow}>
-              <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>現在の資金</Text>
+              <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>採掘した資源量</Text>
               <Text style={[styles.breakdownValue, { color: colors.text }]}>
-                {Math.floor(currentFunds).toLocaleString()} G
+                {Math.floor(totalResourcesMined).toLocaleString()} pt
               </Text>
             </View>
             <View style={styles.breakdownRow}>
-              <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>使用した資金</Text>
+              <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>研究投資</Text>
               <Text style={[styles.breakdownValue, { color: colors.text }]}>
-                {totalFundsSpent.toLocaleString()} G
+                {totalResearchSpent.toLocaleString()} pt
               </Text>
             </View>
           </View>

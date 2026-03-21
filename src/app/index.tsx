@@ -18,6 +18,7 @@ import {
   DEMOLISH_DURATION_MS,
   RESEARCH_DURATION_MS,
   buildFacility,
+  computeScore,
   demolishFacility,
   getAdjacentIndices,
   getFacilityDisplayName,
@@ -66,7 +67,7 @@ export default function GameScreen() {
       setGame((g) => ({
         ...g,
         status: 'finished',
-        score: Math.floor(g.player.funds + g.player.totalFundsSpent),
+        score: (() => { const b = computeScore(g); return b.resourcesMined + b.researchSpent; })(),
       }));
     }
   }, [remaining, gameStarted, gameFinished]);
@@ -413,8 +414,8 @@ export default function GameScreen() {
       <ResultModal
         visible={gameFinished}
         score={game.score}
-        currentFunds={game.player.funds}
-        totalFundsSpent={game.player.totalFundsSpent}
+        totalResourcesMined={computeScore(game).resourcesMined}
+        totalResearchSpent={computeScore(game).researchSpent}
         onRestart={handleRestart}
       />
     </SafeAreaView>

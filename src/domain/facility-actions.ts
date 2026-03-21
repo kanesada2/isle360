@@ -1,7 +1,7 @@
 import type { FacilityCatalogEntry } from './facility-catalog';
 import { FACILITY_CATALOG } from './facility-catalog';
 import { newFacilityId } from './id';
-import type { ResearchCatalogEntry } from './research-catalog';
+import { RESEARCH_CATALOG, type ResearchCatalogEntry } from './research-catalog';
 import type { Extractor, Facility, FacilityId, Game, Laboratory, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
 
 export const BUILD_DURATION_MS = 20_000;
@@ -45,7 +45,6 @@ export function startResearch(
   const newPlayer = {
     ...game.player,
     funds: Math.round((game.player.funds - cost) * 100) / 100,
-    totalFundsSpent: game.player.totalFundsSpent + cost,
   };
 
   return { ...game, player: newPlayer, facilities: newFacilities };
@@ -180,7 +179,6 @@ export function buildFacility(
   const newPlayer = {
     ...game.player,
     funds: game.player.funds - entry.buildCost,
-    totalFundsSpent: game.player.totalFundsSpent + entry.buildCost,
   };
 
   return { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
@@ -313,4 +311,33 @@ export function tickFacilities(game: Game, now: number): Game {
 
   if (!changed) return game;
   return { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
+}
+
+/**
+ * ゲーム終了時のスコア内訳を計算する。
+ * - resourcesMined: 全plotの (abundance - current) の合計（採掘した資源量）
+ * - researchSpent:  完了した研究に実際に支払ったコストの合計
+ */
+export function computeScore(game: Game): { resourcesMined: number; researchSpent: number } {
+  let resourcesMined = 0;
+  for (const plot of game.plots) {
+    for (const deposit of plot.deposits) {
+      resourcesMined += deposit.abundance - deposit.current;
+    }
+  }
+
+  let researchSpent = 0;
+  for (const [researchId, level] of game.player.completedResearch) {
+    const entry = RESEARCH_CATALOG.find((e) => e.key === researchId);
+    if (!entry) continue;
+    // レベル 0→1, 1→2, … (level-1)→level と研究するたびに支払ったコストを積算
+    for (let i = 0; i < level; i++) {
+      researchSpent += Math.round(entry.baseCost * Math.pow(1.5, i));
+    }
+  }
+
+  return {
+    resourcesMined: Math.floor(resourcesMined),
+    researchSpent,
+  };
 }

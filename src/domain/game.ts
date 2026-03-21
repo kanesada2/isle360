@@ -11,7 +11,6 @@ export function createGame({ sessionDurationMs, initialFunds }: CreateGameParams
   const player: Player = {
     id: newPlayerId(),
     funds: initialFunds,
-    totalFundsSpent: 0,
     completedResearch: new Map(),
     activeResearchJobs: [],
   };

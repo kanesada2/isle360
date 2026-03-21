@@ -66,7 +66,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     name: "精製技術向上",
     description:
       "精製工場によって高まる付加価値が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加する。",
-    baseCost: 100,
+    baseCost: 200,
     repeatable: true,
     prerequisites: [],
   },
