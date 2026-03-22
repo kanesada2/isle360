@@ -70,4 +70,13 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     repeatable: true,
     prerequisites: [],
   },
+  {
+    key: "construction-efficiency",
+    name: "建築技術向上",
+    description:
+      "施設の建造・破壊にかかる時間が 10% 短縮される。繰り返し研究可能だがコストは毎回 50% 増加する。",
+    baseCost: 300,
+    repeatable: true,
+    prerequisites: [],
+  },
 ] as const;

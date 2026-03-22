@@ -102,6 +102,15 @@ function getExtractionMultiplier(
 }
 
 /**
+ * 建築技術研究によるレベルから建造・破壊時間の短縮倍率を計算する。
+ * 1 レベルごとに -10%（複利）。
+ */
+function getConstructionMultiplier(completedResearch: Map<ResearchId, number>): number {
+  const level = completedResearch.get('construction-efficiency' as ResearchId) ?? 0;
+  return Math.pow(0.9, level);
+}
+
+/**
  * 精製技術研究によるレベルから精製工場の追加倍率を計算する。
  * 1 レベルごとに +20%（複利）。
  */
@@ -145,7 +154,7 @@ export function buildFacility(
     buildCost: entry.buildCost,
     demolishCost: entry.demolishCost,
     state: 'constructing' as const,
-    currentJob: { startedAt: now, durationMs: entry.buildDurationMs ?? BUILD_DURATION_MS },
+    currentJob: { startedAt: now, durationMs: Math.round((entry.buildDurationMs ?? BUILD_DURATION_MS) * getConstructionMultiplier(game.player.completedResearch)) },
   };
 
   let facility: Facility;
@@ -199,7 +208,7 @@ export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number):
   newFacilities.set(facilityId, {
     ...facility,
     state: 'demolishing' as const,
-    currentJob: { startedAt: now, durationMs: DEMOLISH_DURATION_MS },
+    currentJob: { startedAt: now, durationMs: Math.round(DEMOLISH_DURATION_MS * getConstructionMultiplier(game.player.completedResearch)) },
   });
   const newPlayer = {
     ...game.player,
@@ -316,36 +325,67 @@ export function tickFacilities(game: Game, now: number): Game {
   return { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
 }
 
+export type ResearchBreakdownItem = {
+  name: string;
+  level: number;
+  cost: number;
+  repeatable: boolean;
+};
+
+export type ScoreBreakdown = {
+  total: number;
+  resourcesMined: number;
+  resourcesByType: Record<ResourceType, number>;
+  researchSpent: number;
+  researchBreakdown: ResearchBreakdownItem[];
+  monumentBonus: number;
+  monumentCount: number;
+};
+
 /**
  * ゲーム終了時のスコア内訳を計算する。
- * - resourcesMined: 全plotの (abundance - current) の合計（採掘した資源量）
- * - researchSpent:  完了した研究に実際に支払ったコストの合計
  */
-export function computeScore(game: Game): { resourcesMined: number; researchSpent: number; monumentBonus: number } {
+export function computeScore(game: Game): ScoreBreakdown {
   let resourcesMined = 0;
+  const resourcesByType: Record<ResourceType, number> = { agriculture: 0, mineral: 0, energy: 0 };
   for (const plot of game.plots) {
     for (const deposit of plot.deposits) {
-      resourcesMined += deposit.abundance - deposit.current;
+      const mined = deposit.abundance - deposit.current;
+      resourcesMined += mined;
+      resourcesByType[deposit.type] += mined;
     }
   }
 
   let researchSpent = 0;
+  const researchBreakdown: ResearchBreakdownItem[] = [];
   for (const [researchId, level] of game.player.completedResearch) {
     const entry = RESEARCH_CATALOG.find((e) => e.key === researchId);
     if (!entry) continue;
-    // レベル 0→1, 1→2, … (level-1)→level と研究するたびに支払ったコストを積算
     for (let i = 0; i < level; i++) {
-      researchSpent += Math.round(entry.baseCost * Math.pow(1.5, i));
+      const cost = Math.round(entry.baseCost * Math.pow(1.5, i));
+      researchSpent += cost;
+      researchBreakdown.push({ name: entry.name, level: i + 1, cost, repeatable: entry.repeatable });
     }
   }
 
-  const monumentBonus = [...game.facilities.values()].filter(
+  const monumentCount = [...game.facilities.values()].filter(
     (f) => f.kind === 'monument' && f.state === 'idle',
-  ).length * 5000;
+  ).length;
+  const monumentBonus = monumentCount * 5000;
+
+  const total = Math.floor(resourcesMined) + researchSpent + monumentBonus;
 
   return {
+    total,
     resourcesMined: Math.floor(resourcesMined),
+    resourcesByType: {
+      agriculture: Math.floor(resourcesByType.agriculture),
+      mineral: Math.floor(resourcesByType.mineral),
+      energy: Math.floor(resourcesByType.energy),
+    },
     researchSpent,
+    researchBreakdown,
     monumentBonus,
+    monumentCount,
   };
 }

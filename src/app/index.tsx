@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -64,13 +64,20 @@ export default function GameScreen() {
   useEffect(() => {
     if (!gameStarted || gameFinished) return;
     if (remaining === 0) {
-      setGame((g) => ({
-        ...g,
-        status: 'finished',
-        score: (() => { const b = computeScore(g); return b.resourcesMined + b.researchSpent + b.monumentBonus; })(),
-      }));
+      setGame((g) => {
+        const b = computeScore(g);
+        return { ...g, status: 'finished', score: b.total };
+      });
     }
   }, [remaining, gameStarted, gameFinished]);
+
+  // ゲーム終了時に全モーダルを閉じる
+  useEffect(() => {
+    if (!gameFinished) return;
+    setBuildModalVisible(false);
+    setFacilityDetailVisible(false);
+    setLabModalVisible(false);
+  }, [gameFinished]);
 
   // ── プロットナビゲーション ────────────────────────────────────
   const [selectedPlotIndex, setSelectedPlotIndex] = useState<PlotIndex>(4);
@@ -202,20 +209,23 @@ export default function GameScreen() {
   }, [currentFacility, game.player.completedResearch, game.plots, game.facilities]);
 
   const handleFacilityTap = useCallback(() => {
-    if (!currentFacility) return;
+    if (!gameStarted) return;
+    if (!currentFacility) {
+      setBuildModalVisible(true);
+      return;
+    }
     if (currentFacility.kind === 'laboratory') {
-      if (currentFacility.state === 'idle') {
+      if (currentFacility.state === 'idle' || currentFacility.state === 'processing') {
         setLabFacilityId(currentFacility.id);
         setLabModalVisible(true);
       }
-      // processing 中は何もしない（メイン画面のプログレスバーで確認可能）
     } else if (
       currentFacility.state === 'idle' &&
       (currentFacility.kind === 'extractor' || currentFacility.kind === 'refinery')
     ) {
       setFacilityDetailVisible(true);
     }
-  }, [currentFacility]);
+  }, [gameStarted, currentFacility]);
 
   // ゲームループで currentFacility が毎フレーム更新されても
   // tapGesture を再生成しないよう ref 経由で最新の関数を保持する
@@ -247,9 +257,6 @@ export default function GameScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* 残り時間 */}
-      <TimerBar remaining={remaining} sessionDurationMs={game.sessionDurationMs} />
-
       {/* フェーズ別資源バー */}
       <View style={styles.phaseBarsRow}>
         {([1, 2, 3] as const).map((phase) => (
@@ -335,46 +342,7 @@ export default function GameScreen() {
 
       {/* 下部操作バー */}
       <View style={styles.bottomBar}>
-        <View style={styles.actionButtons}>
-          {(() => {
-            const buildDisabled = !gameStarted || currentFacility !== undefined;
-            const demolishDisabled =
-              !gameStarted ||
-              !currentFacility ||
-              currentFacility.state === 'constructing' ||
-              currentFacility.state === 'demolishing';
-            return (
-              <>
-                <Pressable
-                  disabled={buildDisabled}
-                  style={({ pressed }) => [
-                    styles.button,
-                    {
-                      backgroundColor: pressed ? colors.backgroundSelected : colors.backgroundElement,
-                      opacity: buildDisabled ? 0.4 : 1,
-                    },
-                  ]}
-                  onPress={() => setBuildModalVisible(true)}
-                >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>建設</Text>
-                </Pressable>
-                <Pressable
-                  disabled={demolishDisabled}
-                  style={({ pressed }) => [
-                    styles.button,
-                    {
-                      backgroundColor: pressed ? colors.backgroundSelected : colors.backgroundElement,
-                      opacity: demolishDisabled ? 0.4 : 1,
-                    },
-                  ]}
-                  onPress={handleDemolish}
-                >
-                  <Text style={[styles.buttonText, { color: colors.text }]}>破壊</Text>
-                </Pressable>
-              </>
-            );
-          })()}
-        </View>
+        <TimerBar remaining={remaining} sessionDurationMs={game.sessionDurationMs} />
         <View style={styles.fundsDisplay}>
           <Text style={[styles.fundsLabel, { color: colors.textSecondary }]}>資金</Text>
           <Text style={[styles.fundsValue, { color: colors.text }]}>
@@ -396,6 +364,10 @@ export default function GameScreen() {
         onClose={() => setFacilityDetailVisible(false)}
         title={currentFacility ? getFacilityDisplayName(currentFacility) : ''}
         rows={facilityDetailRows}
+        onDemolish={() => {
+          setFacilityDetailVisible(false);
+          handleDemolish();
+        }}
       />
       {/* 研究モーダル（Laboratory からのみ開く） */}
       <ResearchModal
@@ -407,16 +379,22 @@ export default function GameScreen() {
           if (!labFacilityId) return;
           setGame((g) => startResearch(g, labFacilityId, entry, Date.now()));
         }}
+        onDemolish={() => {
+          setLabModalVisible(false);
+          handleDemolish();
+        }}
+        labProcessing={
+          labFacilityId
+            ? game.facilities.get(labFacilityId)?.state === 'processing'
+            : false
+        }
       />
       {/* ゲームスタートオーバーレイ（スワイプは背後のGestureDetectorへ通過） */}
       {!gameStarted && <StartOverlay onStart={handleStart} />}
       {/* リザルトモーダル */}
       <ResultModal
         visible={gameFinished}
-        score={game.score}
-        totalResourcesMined={computeScore(game).resourcesMined}
-        totalResearchSpent={computeScore(game).researchSpent}
-        monumentBonus={computeScore(game).monumentBonus}
+        breakdown={computeScore(game)}
         onRestart={handleRestart}
       />
     </SafeAreaView>
@@ -460,21 +438,8 @@ const styles = StyleSheet.create({
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: Spacing.two,
-  },
-  actionButtons: {
-    flexDirection: 'row',
     gap: Spacing.two,
-  },
-  button: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-  },
-  buttonText: {
-    fontSize: 15,
-    fontWeight: '600',
+    paddingBottom: Spacing.two,
   },
   fundsDisplay: {
     alignItems: 'flex-end',

@@ -11,9 +11,12 @@ type Props = {
   onResearch: (entry: ResearchCatalogEntry) => void;
   completedResearch: Map<ResearchId, number>;
   funds: number;
+  onDemolish?: () => void;
+  demolishDisabled?: boolean;
+  labProcessing?: boolean;
 };
 
-export function ResearchModal({ visible, onClose, onResearch, completedResearch, funds }: Props) {
+export function ResearchModal({ visible, onClose, onResearch, completedResearch, funds, onDemolish, demolishDisabled, labProcessing }: Props) {
   const [selectedKey, setSelectedKey] = useState<string>(RESEARCH_CATALOG[0].key);
   const selected = RESEARCH_CATALOG.find((e) => e.key === selectedKey) ?? RESEARCH_CATALOG[0];
 
@@ -24,9 +27,10 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
       (prereq) => (completedResearch.get(prereq as ResearchId) ?? 0) >= 1,
     );
     const cost = getResearchCost(e, completedResearch);
+    const nextLevel = (completedResearch.get(e.key as ResearchId) ?? 0) + 1;
     return {
       key: e.key,
-      name: e.name,
+      name: e.repeatable ? `${e.name} Lv.${nextLevel}` : e.name,
       costLabel: e.repeatable ? `${cost.toLocaleString()} G〜` : `${cost.toLocaleString()} G`,
       disabled: !prerequisitesMet || cost > funds,
     };
@@ -46,6 +50,9 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
         onResearch(selected);
         onClose();
       }}
+      onDemolish={onDemolish}
+      demolishDisabled={demolishDisabled}
+      actionForceDisabled={labProcessing}
     />
   );
 }

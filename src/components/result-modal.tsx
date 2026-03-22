@@ -1,18 +1,22 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
+import type { ScoreBreakdown } from '@/domain/facility-actions';
 
 type Props = {
   visible: boolean;
-  score: number;
-  totalResourcesMined: number;
-  totalResearchSpent: number;
-  monumentBonus: number;
+  breakdown: ScoreBreakdown;
   onRestart: () => void;
 };
 
-export function ResultModal({ visible, score, totalResourcesMined, totalResearchSpent, monumentBonus, onRestart }: Props) {
+const RESOURCE_LABELS: Record<string, string> = {
+  agriculture: '農産',
+  mineral: '鉱物',
+  energy: 'エネルギー',
+};
+
+export function ResultModal({ visible, breakdown, onRestart }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -25,32 +29,49 @@ export function ResultModal({ visible, score, totalResourcesMined, totalResearch
           <View style={[styles.scoreBox, { backgroundColor: colors.background }]}>
             <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>スコア</Text>
             <Text style={[styles.scoreValue, { color: colors.text }]}>
-              {score.toLocaleString()} pt
+              {breakdown.total.toLocaleString()} pt
             </Text>
           </View>
 
-          <View style={[styles.breakdown, { borderTopColor: colors.backgroundSelected }]}>
-            <View style={styles.breakdownRow}>
-              <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>採掘した資源量</Text>
-              <Text style={[styles.breakdownValue, { color: colors.text }]}>
-                {Math.floor(totalResourcesMined).toLocaleString()} pt
-              </Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>研究投資</Text>
-              <Text style={[styles.breakdownValue, { color: colors.text }]}>
-                {totalResearchSpent.toLocaleString()} pt
-              </Text>
-            </View>
-            {monumentBonus > 0 && (
-              <View style={styles.breakdownRow}>
-                <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>繁栄の象徴</Text>
-                <Text style={[styles.breakdownValue, { color: colors.text }]}>
-                  {monumentBonus.toLocaleString()} pt
-                </Text>
-              </View>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.breakdown, { borderTopColor: colors.backgroundSelected }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 資源量（合計＋内訳） */}
+            <Row label="採掘した資源量" value={`${breakdown.resourcesMined.toLocaleString()} pt`} colors={colors} bold />
+            {Object.entries(breakdown.resourcesByType).map(([type, amount]) => (
+              <Row
+                key={type}
+                label={`　${RESOURCE_LABELS[type] ?? type}`}
+                value={`${amount.toLocaleString()} pt`}
+                colors={colors}
+                sub
+              />
+            ))}
+
+            {/* 研究投資（合計＋内訳） */}
+            <Row label="研究投資" value={`${breakdown.researchSpent.toLocaleString()} pt`} colors={colors} bold />
+            {breakdown.researchBreakdown.map((item, i) => (
+              <Row
+                key={i}
+                label={`　${item.name}${item.repeatable ? ` Lv.${item.level}` : ''}`}
+                value={`${item.cost.toLocaleString()} pt`}
+                colors={colors}
+                sub
+              />
+            ))}
+
+            {/* 繁栄の象徴 */}
+            {breakdown.monumentCount > 0 && (
+              <Row
+                label={`繁栄の象徴 ×${breakdown.monumentCount}`}
+                value={`${breakdown.monumentBonus.toLocaleString()} pt`}
+                colors={colors}
+                bold
+              />
             )}
-          </View>
+          </ScrollView>
 
           <Pressable
             style={({ pressed }) => [
@@ -69,6 +90,27 @@ export function ResultModal({ visible, score, totalResourcesMined, totalResearch
   );
 }
 
+type RowProps = {
+  label: string;
+  value: string;
+  colors: { text: string; textSecondary: string };
+  bold?: boolean;
+  sub?: boolean;
+};
+
+function Row({ label, value, colors, bold, sub }: RowProps) {
+  return (
+    <View style={styles.breakdownRow}>
+      <Text style={[styles.breakdownLabel, { color: sub ? colors.textSecondary : colors.text, fontWeight: bold ? '600' : '400' }]}>
+        {label}
+      </Text>
+      <Text style={[styles.breakdownValue, { color: sub ? colors.textSecondary : colors.text }]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -79,6 +121,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
+    maxHeight: '85%',
     borderRadius: Spacing.three,
     padding: Spacing.four,
     gap: Spacing.three,
@@ -102,6 +145,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
+  scroll: {
+    flexGrow: 0,
+  },
   breakdown: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: Spacing.two,
@@ -110,9 +156,11 @@ const styles = StyleSheet.create({
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: Spacing.two,
   },
   breakdownLabel: {
     fontSize: 14,
+    flex: 1,
   },
   breakdownValue: {
     fontSize: 14,

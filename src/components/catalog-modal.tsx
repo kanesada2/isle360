@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Pressable,
   Modal,
@@ -16,7 +16,7 @@ export type CatalogModalItem = {
   name: string;
   /** コスト表示文字列（例: "200 G"、"200 G〜"） */
   costLabel: string;
-  /** true の場合、選択・実行不可でグレーアウト表示 */
+  /** true の場合、グレーアウト表示・実行不可（選択は可能） */
   disabled?: boolean;
 };
 
@@ -30,6 +30,9 @@ type Props = {
   descriptionText: string;
   actionLabel: string;
   onAction: () => void;
+  onDemolish?: () => void;
+  demolishDisabled?: boolean;
+  actionForceDisabled?: boolean;
 };
 
 export function CatalogModal({
@@ -42,12 +45,21 @@ export function CatalogModal({
   descriptionText,
   actionLabel,
   onAction,
+  onDemolish,
+  demolishDisabled = false,
+  actionForceDisabled = false,
 }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => { if (!visible) setConfirming(false); }, [visible]);
+
+  const selectedItem = items.find((item) => item.key === selectedKey);
+  const actionDisabled = (selectedItem?.disabled ?? false) || actionForceDisabled;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       {/* 背景タップで閉じる */}
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* カード内タップは伝播させない */}
@@ -65,7 +77,6 @@ export function CatalogModal({
               return (
                 <Pressable
                   key={item.key}
-                  disabled={disabled}
                   style={[
                     styles.listItem,
                     {
@@ -97,9 +108,13 @@ export function CatalogModal({
 
           {/* アクションボタン */}
           <Pressable
+            disabled={actionDisabled}
             style={({ pressed }) => [
               styles.actionButton,
-              { backgroundColor: pressed ? colors.backgroundSelected : colors.text },
+              {
+                backgroundColor: pressed ? colors.backgroundSelected : colors.text,
+                opacity: actionDisabled ? 0.35 : 1,
+              },
             ]}
             onPress={onAction}
           >
@@ -107,6 +122,45 @@ export function CatalogModal({
               {actionLabel}
             </Text>
           </Pressable>
+
+          {/* 破壊ボタン */}
+          {onDemolish && (
+            confirming ? (
+              <View style={[styles.confirmBox, { backgroundColor: colors.background }]}>
+                <Text style={[styles.confirmText, { color: colors.textSecondary }]}>
+                  本当に破壊しますか？（10秒）
+                </Text>
+                <View style={styles.confirmButtons}>
+                  <Pressable
+                    style={({ pressed }) => [styles.confirmBtn, { backgroundColor: pressed ? colors.backgroundSelected : colors.backgroundElement }]}
+                    onPress={() => setConfirming(false)}
+                  >
+                    <Text style={[styles.confirmBtnText, { color: colors.text }]}>キャンセル</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.confirmBtn, { backgroundColor: pressed ? '#c62828' : '#F44336' }]}
+                    onPress={() => { setConfirming(false); onDemolish(); }}
+                  >
+                    <Text style={[styles.confirmBtnText, { color: '#ffffff' }]}>破壊する</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                disabled={demolishDisabled}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  {
+                    backgroundColor: pressed ? '#c62828' : '#F44336',
+                    opacity: demolishDisabled ? 0.35 : 1,
+                  },
+                ]}
+                onPress={() => setConfirming(true)}
+              >
+                <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>破壊する</Text>
+              </Pressable>
+            )
+          )}
 
         </Pressable>
       </Pressable>
@@ -118,15 +172,16 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   card: {
-    borderTopLeftRadius: Spacing.three,
-    borderTopRightRadius: Spacing.three,
+    borderRadius: Spacing.three,
     paddingTop: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.four,
-    maxHeight: '75%',
+    paddingBottom: Spacing.three,
+    width: '88%',
+    maxHeight: '72%',
   },
   listScroll: {
     flexGrow: 0,
@@ -174,6 +229,30 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 15,
+    fontWeight: '700',
+  },
+  confirmBox: {
+    borderRadius: Spacing.two,
+    padding: Spacing.two,
+    marginTop: Spacing.two,
+    gap: Spacing.two,
+  },
+  confirmText: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+  },
+  confirmBtnText: {
+    fontSize: 14,
     fontWeight: '700',
   },
 });
