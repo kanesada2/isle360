@@ -75,6 +75,5 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "島の繁栄を示す巨大な建造物。建設に多大なコストと時間を要するが、その完成はスコアに大きく貢献する。",
     buildCost: 3000,
     demolishCost: 0,
-    buildDurationMs: 40_000,
   },
 ] as const;

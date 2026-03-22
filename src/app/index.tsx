@@ -360,6 +360,9 @@ export default function GameScreen() {
         onBuild={handleBuild}
         availableFacilityKeys={availableFacilityKeys}
         funds={game.player.funds}
+        monumentUnderConstruction={[...game.facilities.values()].some(
+          (f) => f.kind === 'monument' && f.state === 'constructing',
+        )}
       />
       {/* 施設詳細モーダル（Extractor / Refinery） */}
       <FacilityDetailModal

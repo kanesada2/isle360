@@ -9,9 +9,10 @@ type Props = {
   onBuild: (entry: FacilityCatalogEntry) => void;
   availableFacilityKeys: Set<string>;
   funds: number;
+  monumentUnderConstruction: boolean;
 };
 
-export function BuildModal({ visible, onClose, onBuild, availableFacilityKeys, funds }: Props) {
+export function BuildModal({ visible, onClose, onBuild, availableFacilityKeys, funds, monumentUnderConstruction }: Props) {
   const firstAvailableKey =
     FACILITY_CATALOG.find((e) => availableFacilityKeys.has(e.key))?.key ?? FACILITY_CATALOG[0].key;
   const [selectedKey, setSelectedKey] = useState<string>(firstAvailableKey);
@@ -21,7 +22,10 @@ export function BuildModal({ visible, onClose, onBuild, availableFacilityKeys, f
     key: e.key,
     name: e.name,
     costLabel: `${e.buildCost.toLocaleString()} G`,
-    disabled: !availableFacilityKeys.has(e.key) || e.buildCost > funds,
+    disabled:
+      !availableFacilityKeys.has(e.key) ||
+      e.buildCost > funds ||
+      (e.key === 'monument' && monumentUnderConstruction),
   }));
 
   return (
