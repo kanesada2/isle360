@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   Modal,
@@ -53,15 +53,24 @@ export function CatalogModal({
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   const [confirming, setConfirming] = useState(false);
-  useEffect(() => { if (!visible) setConfirming(false); }, [visible]);
+  const blockBackdropRef = useRef(false);
+  useEffect(() => {
+    if (visible) {
+      blockBackdropRef.current = true;
+      const id = setTimeout(() => { blockBackdropRef.current = false; }, 150);
+      return () => clearTimeout(id);
+    } else {
+      setConfirming(false);
+    }
+  }, [visible]);
 
   const selectedItem = items.find((item) => item.key === selectedKey);
   const actionDisabled = (selectedItem?.disabled ?? false) || actionForceDisabled;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      {/* 背景タップで閉じる */}
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      {/* 背景タップで閉じる（開いた直後の誤閉じを防ぐ） */}
+      <Pressable style={styles.backdrop} onPress={() => { if (!blockBackdropRef.current) onClose(); }}>
         {/* カード内タップは伝播させない */}
         <Pressable style={[styles.card, { backgroundColor: colors.backgroundElement }]} onPress={() => {}}>
 

@@ -21,20 +21,26 @@ export function TimerBar({ remaining, sessionDurationMs }: Props) {
 
   const ratio = remaining / sessionDurationMs;
   const barColor = ratio < 0.2 ? '#F44336' : colors.text;
-  const label = formatTime(remaining);
 
   return (
     <View style={[styles.track, { backgroundColor: colors.backgroundElement }]}>
-      {/* バーが届かない領域：背景色上で読める色のテキスト */}
+      <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: barColor }]} />
       <View style={styles.labelWrap}>
-        <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
-      </View>
-
-      {/* フィル：バー色上で読める色のテキストをクリップ描画 */}
-      <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: barColor }]}>
-        <View style={styles.labelWrap}>
-          <Text style={[styles.label, { color: colors.background }]}>{label}</Text>
-        </View>
+        <Text
+          style={[
+            styles.label,
+            {
+              // バー色（colors.text）の反対色なのでバー上で視認できる
+              color: colors.background,
+              // ハロー効果でバーがない背景上でも読める
+              textShadowColor: colors.text,
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 6,
+            },
+          ]}
+        >
+          {formatTime(remaining)}
+        </Text>
       </View>
     </View>
   );
@@ -52,7 +58,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    overflow: 'hidden',
   },
   labelWrap: {
     position: 'absolute',
