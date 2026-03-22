@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { InteractionManager, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -210,20 +210,23 @@ export default function GameScreen() {
 
   const handleFacilityTap = useCallback(() => {
     if (!gameStarted) return;
+    // InteractionManager.runAfterInteractions でモーダル開放を全インタラクション完了後に遅延し、
+    // 現在のタッチイベント処理が完全に終わってからモーダルを開く。
+    // これにより「開いた瞬間にモーダルが閉じる」「ボタンが即確定される」を防ぐ。
     if (!currentFacility) {
-      setBuildModalVisible(true);
+      InteractionManager.runAfterInteractions().then(() =>setBuildModalVisible(true));
       return;
     }
     if (currentFacility.kind === 'laboratory') {
       if (currentFacility.state === 'idle' || currentFacility.state === 'processing') {
         setLabFacilityId(currentFacility.id);
-        setLabModalVisible(true);
+        InteractionManager.runAfterInteractions().then(() =>setLabModalVisible(true));
       }
     } else if (
       currentFacility.state === 'idle' &&
       (currentFacility.kind === 'extractor' || currentFacility.kind === 'refinery')
     ) {
-      setFacilityDetailVisible(true);
+      InteractionManager.runAfterInteractions().then(() =>setFacilityDetailVisible(true));
     }
   }, [gameStarted, currentFacility]);
 

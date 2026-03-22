@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
@@ -19,20 +19,11 @@ export function FacilityDetailModal({ visible, onClose, title, rows, onDemolish,
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   const [confirming, setConfirming] = useState(false);
-  const blockBackdropRef = useRef(false);
-  useEffect(() => {
-    if (visible) {
-      blockBackdropRef.current = true;
-      const id = setTimeout(() => { blockBackdropRef.current = false; }, 150);
-      return () => clearTimeout(id);
-    } else {
-      setConfirming(false);
-    }
-  }, [visible]);
+  useEffect(() => { if (!visible) setConfirming(false); }, [visible]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={() => { if (!blockBackdropRef.current) onClose(); }}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.card, { backgroundColor: colors.backgroundElement }]} onPress={() => {}}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
 
