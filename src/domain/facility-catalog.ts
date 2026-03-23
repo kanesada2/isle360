@@ -33,7 +33,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     resourceType: "mineral",
     name: "鉱山",
     description:
-      "鉱物資源を掘削する施設。農業採集所より建設コストが高いが、単価の高い資源を産出できる。",
+      "鉱物資源を掘削する施設。建設のためには研究が必要。農場より建設コストが高いが、単価の高い資源を産出できる。",
     buildCost: 400,
     demolishCost: 100,
     requiredResearchKey: "mineral-survey",
@@ -44,7 +44,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     resourceType: "energy",
     name: "エネルギー生産場",
     description:
-      "エネルギー資源を回収する施設。Phase 3 解放後に建設可能。高効率だが建設コストが最も高い。",
+      "エネルギー資源を回収する施設。建設のためには研究が必要。建設コストが最も高いが、最も高い単価の資源を採集できる。",
     buildCost: 600,
     demolishCost: 150,
     requiredResearchKey: "energy-survey",
@@ -54,7 +54,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     kind: "refinery",
     name: "精製工場",
     description:
-      "採集された資源に付加価値を加えて売却価格を高める施設。隣接する最大8マスに効果を与える。",
+      "採集された資源に付加価値を加えて売却価格を高める施設。",
     buildCost: 500,
     demolishCost: 120,
   },
@@ -63,7 +63,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     kind: "laboratory",
     name: "研究所",
     description:
-      "新技術の研究を進める施設。複数建設すると研究を並列化・加速できる。長期戦略に不可欠。",
+      "新技術の研究を進める施設。複数建設すると研究を並列化・加速できる。",
     buildCost: 500,
     demolishCost: 120,
   },
@@ -72,7 +72,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     kind: "monument",
     name: "繁栄の象徴",
     description:
-      "島の繁栄を示す巨大な建造物。建設に多大なコストと時間を要するが、その完成はスコアに大きく貢献する。",
+      "島の繁栄を示す建造物。一つの建設が完了するまで、次を建設開始できない。スコアに大きく貢献する。p",
     buildCost: 3000,
     demolishCost: 0,
   },

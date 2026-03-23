@@ -189,17 +189,15 @@ export default function GameScreen() {
     }
 
     if (currentFacility.kind === 'refinery') {
-      const adjIndices = getAdjacentIndices(currentFacility.plotIndex);
-      const activeCount = adjIndices.filter((idx) => {
-        const fid = game.plots[idx].facilityId;
-        if (!fid) return false;
-        const f = game.facilities.get(fid);
+      const activeCount = game.plots.filter((p) => {
+        if (!p.facilityId) return false;
+        const f = game.facilities.get(p.facilityId);
         return f?.kind === 'extractor' && f.state === 'idle';
       }).length;
       const researchLevel = game.player.completedResearch.get('refinery-efficiency' as ResearchId) ?? 0;
       const effectiveMultiplier = currentFacility.valueMultiplier * Math.pow(1.2, researchLevel);
       return [
-        { label: '有効マス',       value: `${activeCount} / ${adjIndices.length}` },
+        { label: '効果対象',       value: `稼働中の採集施設 ${activeCount} マス` },
         { label: '精製研究レベル', value: `Lv.${researchLevel}` },
         { label: '価値増加倍率',   value: `×${effectiveMultiplier.toFixed(2)}` },
       ];
@@ -308,13 +306,9 @@ export default function GameScreen() {
                 </Text>
               </Text>
               {currentFacility.currentJob && (() => {
-                const durationMs =
-                  currentFacility.state === 'constructing' ? BUILD_DURATION_MS :
-                  currentFacility.state === 'processing'   ? RESEARCH_DURATION_MS :
-                  DEMOLISH_DURATION_MS;
                 const ratio = Math.min(
                   1,
-                  (now - currentFacility.currentJob.startedAt) / durationMs,
+                  (now - currentFacility.currentJob.startedAt) / currentFacility.currentJob.durationMs,
                 );
                 const isDemolish = currentFacility.state === 'demolishing';
                 return (

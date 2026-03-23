@@ -121,7 +121,7 @@ function getRefineryResearchMultiplier(completedResearch: Map<ResearchId, number
 
 /**
  * 指定 Extractor の採掘で適用される精製倍率を計算する。
- * 上下左右に稼働中の Refinery があれば、それぞれの有効倍率を積算する。
+ * グリッド全体の稼働中 Refinery それぞれの有効倍率を積算する。
  */
 function calcRefineryMultiplier(
   extractorPlotIndex: PlotIndex,
@@ -130,12 +130,13 @@ function calcRefineryMultiplier(
   completedResearch: Map<ResearchId, number>,
 ): number {
   let multiplier = 1.0;
-  for (const adjIdx of getAdjacentIndices(extractorPlotIndex)) {
-    const facilityId = plots[adjIdx].facilityId;
+  for (let i = 0; i < plots.length; i++) {
+    if (i === extractorPlotIndex) continue;
+    const facilityId = plots[i].facilityId;
     if (!facilityId) continue;
-    const adj = facilities.get(facilityId);
-    if (!adj || adj.kind !== 'refinery' || adj.state !== 'idle') continue;
-    multiplier *= (adj as Refinery).valueMultiplier * getRefineryResearchMultiplier(completedResearch);
+    const facility = facilities.get(facilityId);
+    if (!facility || facility.kind !== 'refinery' || facility.state !== 'idle') continue;
+    multiplier *= (facility as Refinery).valueMultiplier * getRefineryResearchMultiplier(completedResearch);
   }
   return multiplier;
 }
