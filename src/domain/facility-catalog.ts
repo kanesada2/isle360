@@ -1,4 +1,4 @@
-import type { Facility, ResourceType } from "./types";
+import type { Facility, ResearchId, ResourceType } from "./types";
 
 export type FacilityCatalogEntry = {
   /** カタログ内での一意キー */
@@ -13,8 +13,10 @@ export type FacilityCatalogEntry = {
   /** 建設時間（ms）。未指定なら BUILD_DURATION_MS を使用 */
   buildDurationMs?: number;
   /** 建設に必要な研究カタログキー。未指定なら初期から建設可能 */
-  requiredResearchKey?: string;
+  requiredResearchKey?: ResearchId;
 };
+
+const r = (s: string) => s as ResearchId;
 
 export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
   {
@@ -36,7 +38,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "鉱物資源を掘削する施設。建設のためには研究が必要。農場より建設コストが高いが、単価の高い資源を産出できる。",
     buildCost: 400,
     demolishCost: 100,
-    requiredResearchKey: "mineral-survey",
+    requiredResearchKey: r("mineral-survey"),
   },
   {
     key: "extractor-energy",
@@ -47,7 +49,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "エネルギー資源を回収する施設。建設のためには研究が必要。建設コストが最も高いが、最も高い単価の資源を採集できる。",
     buildCost: 600,
     demolishCost: 150,
-    requiredResearchKey: "energy-survey",
+    requiredResearchKey: r("energy-survey"),
   },
   {
     key: "refinery",

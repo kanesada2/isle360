@@ -2,14 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
-
-export type DetailRow = { label: string; value: string };
+import type { FacilityDetailRow } from '@/domain/facility-actions';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   title: string;
-  rows: DetailRow[];
+  rows: FacilityDetailRow[];
   onDemolish?: () => void;
   demolishDisabled?: boolean;
 };

@@ -11,7 +11,7 @@ export function getUnlockedPhases(
 ): Set<ResourcePhase> {
   const phases = new Set<ResourcePhase>([1]);
   for (const entry of RESEARCH_CATALOG) {
-    if (entry.unlocksPhase && completedResearch.has(entry.key as ResearchId)) {
+    if (entry.unlocksPhase && completedResearch.has(entry.key)) {
       phases.add(entry.unlocksPhase);
     }
   }
@@ -29,7 +29,7 @@ export function getAvailableFacilityKeys(
   for (const entry of FACILITY_CATALOG) {
     if (
       !entry.requiredResearchKey ||
-      completedResearch.has(entry.requiredResearchKey as ResearchId)
+      completedResearch.has(entry.requiredResearchKey)
     ) {
       available.add(entry.key);
     }

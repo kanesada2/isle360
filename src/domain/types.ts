@@ -23,7 +23,6 @@ export type ResourceDeposit = {
 export type PlotIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type Plot = {
-  index:      PlotIndex;
   deposits:   ResourceDeposit[];
   facilityId: FacilityId | null;
 };
@@ -86,10 +85,9 @@ export type GameStatus = "setup" | "playing" | "finished";
 export type Game = {
   id:                GameId;
   player:            Player;
-  plots:             readonly [Plot, Plot, Plot, Plot, Plot, Plot, Plot, Plot, Plot];
+  plots:             readonly Plot[];
   facilities:        Map<FacilityId, Facility>;
-  sessionDurationMs: number;  // 900_000 or 1_200_000
+  sessionDurationMs: number;
   startedAt:         number | null;
   status:            GameStatus;
-  score:             number;
 };

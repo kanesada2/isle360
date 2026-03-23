@@ -2,11 +2,23 @@ import type { FacilityCatalogEntry } from './facility-catalog';
 import { FACILITY_CATALOG } from './facility-catalog';
 import { newFacilityId } from './id';
 import { RESEARCH_CATALOG, type ResearchCatalogEntry } from './research-catalog';
-import type { Extractor, Facility, FacilityId, Game, Laboratory, Monument, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
+import type { Extractor, Facility, FacilityId, Game, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
 
 export const BUILD_DURATION_MS = 20_000;
 export const DEMOLISH_DURATION_MS = 10_000;
 export const RESEARCH_DURATION_MS = 15_000;
+
+const r = (s: string) => s as ResearchId;
+
+/** ResourceType → 対応する採掘効率研究キー */
+export const EXTRACTION_RESEARCH_KEYS: Record<ResourceType, ResearchId> = {
+  agriculture: r('agri-efficiency'),
+  mineral:     r('mineral-efficiency'),
+  energy:      r('energy-efficiency'),
+};
+
+const REFINERY_EFFICIENCY_KEY   = r('refinery-efficiency');
+const CONSTRUCTION_EFFICIENCY_KEY = r('construction-efficiency');
 
 /**
  * 繰り返し研究の現在コストを返す（baseCost × 1.5^currentLevel）。
@@ -17,7 +29,7 @@ export function getResearchCost(
   completedResearch: Map<ResearchId, number>,
 ): number {
   if (!entry.repeatable) return entry.baseCost;
-  const currentLevel = completedResearch.get(entry.key as ResearchId) ?? 0;
+  const currentLevel = completedResearch.get(entry.key) ?? 0;
   return Math.round(entry.baseCost * Math.pow(1.5, currentLevel));
 }
 
@@ -39,7 +51,7 @@ export function startResearch(
     ...(facility as Laboratory),
     state: 'processing' as const,
     currentJob: { startedAt: now, durationMs: RESEARCH_DURATION_MS },
-    activeResearchId: entry.key as ResearchId,
+    activeResearchId: entry.key,
   });
 
   const newPlayer = {
@@ -72,30 +84,17 @@ function getExtractionMultiplier(
   resourceType: ResourceType,
   completedResearch: Map<ResearchId, number>,
 ): number {
-  const keyMap: Record<ResourceType, string> = {
-    agriculture: 'agri-efficiency',
-    mineral:     'mineral-efficiency',
-    energy:      'energy-efficiency',
-  };
-  const level = completedResearch.get(keyMap[resourceType] as ResearchId) ?? 0;
+  const level = completedResearch.get(EXTRACTION_RESEARCH_KEYS[resourceType]) ?? 0;
   return Math.pow(1.2, level);
 }
 
-/**
- * 建築技術研究によるレベルから建造・破壊時間の短縮倍率を計算する。
- * 1 レベルごとに -10%（複利）。
- */
 function getConstructionMultiplier(completedResearch: Map<ResearchId, number>): number {
-  const level = completedResearch.get('construction-efficiency' as ResearchId) ?? 0;
+  const level = completedResearch.get(CONSTRUCTION_EFFICIENCY_KEY) ?? 0;
   return Math.pow(0.9, level);
 }
 
-/**
- * 精製技術研究によるレベルから精製工場の追加倍率を計算する。
- * 1 レベルごとに +20%（複利）。
- */
 function getRefineryResearchMultiplier(completedResearch: Map<ResearchId, number>): number {
-  const level = completedResearch.get('refinery-efficiency' as ResearchId) ?? 0;
+  const level = completedResearch.get(REFINERY_EFFICIENCY_KEY) ?? 0;
   return Math.pow(1.2, level);
 }
 
@@ -119,6 +118,11 @@ function calcRefineryMultiplier(
     multiplier *= (facility as Refinery).valueMultiplier * getRefineryResearchMultiplier(completedResearch);
   }
   return multiplier;
+}
+
+/** ゲームを開始する（status: playing、startedAt を設定） */
+export function startGame(game: Game, now: number): Game {
+  return { ...game, status: 'playing', startedAt: now };
 }
 
 /** 指定 plot に施設を建設開始する（state: constructing） */
@@ -163,9 +167,9 @@ export function buildFacility(
 
   const newFacilities = new Map(game.facilities);
   newFacilities.set(facilityId, facility);
-  const newPlots = game.plots.map((p, i) =>
+  const newPlots: Plot[] = game.plots.map((p, i) =>
     i === plotIndex ? { ...p, facilityId } : p,
-  ) as unknown as typeof game.plots;
+  );
   const newPlayer = {
     ...game.player,
     funds: game.player.funds - entry.buildCost,
@@ -205,7 +209,7 @@ export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number):
 export function tickFacilities(game: Game, now: number): Game {
   let changed = false;
   const newFacilities = new Map(game.facilities);
-  let newPlots = game.plots;
+  let newPlots: readonly Plot[] = game.plots;
   let newPlayer = game.player;
 
   for (const [id, facility] of game.facilities) {
@@ -242,7 +246,7 @@ export function tickFacilities(game: Game, now: number): Game {
           newFacilities.delete(id);
           newPlots = newPlots.map((p, i) =>
             i === facility.plotIndex ? { ...p, facilityId: null } : p,
-          ) as unknown as typeof game.plots;
+          );
           changed = true;
           continue;
         }
@@ -276,7 +280,7 @@ export function tickFacilities(game: Game, now: number): Game {
     );
     newPlots = newPlots.map((p, i) =>
       i === extractor.plotIndex ? { ...p, deposits: newDeposits } : p,
-    ) as unknown as typeof game.plots;
+    );
 
     // 隣接する稼働中 Refinery の精製倍率を計算して資金加算
     const refineryMult = calcRefineryMultiplier(
@@ -301,6 +305,49 @@ export function tickFacilities(game: Game, now: number): Game {
 
   if (!changed) return game;
   return { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
+}
+
+export type FacilityDetailRow = { label: string; value: string };
+
+/**
+ * 施設詳細モーダルに表示する行データを返す。
+ * idle 状態でない施設や対応行がない種別は空配列を返す。
+ */
+export function getFacilityDetailRows(
+  facility: Facility,
+  plots: readonly Plot[],
+  facilities: Map<FacilityId, Facility>,
+  completedResearch: Map<ResearchId, number>,
+): FacilityDetailRow[] {
+  if (facility.state !== 'idle') return [];
+
+  if (facility.kind === 'extractor') {
+    const level = completedResearch.get(EXTRACTION_RESEARCH_KEYS[facility.resourceType]) ?? 0;
+    const multiplier = Math.pow(1.2, level);
+    return [
+      { label: '研究レベル',      value: `Lv.${level}` },
+      { label: '採掘倍率',        value: `×${multiplier.toFixed(2)}` },
+      { label: '採掘量/サイクル', value: (facility.outputPerCycle * multiplier).toFixed(2) },
+      { label: 'サイクル間隔',    value: `${facility.cycleDurationMs / 1000} 秒` },
+    ];
+  }
+
+  if (facility.kind === 'refinery') {
+    const activeCount = plots.filter((p) => {
+      if (!p.facilityId) return false;
+      const f = facilities.get(p.facilityId);
+      return f?.kind === 'extractor' && f.state === 'idle';
+    }).length;
+    const researchLevel = completedResearch.get(REFINERY_EFFICIENCY_KEY) ?? 0;
+    const effectiveMultiplier = facility.valueMultiplier * Math.pow(1.2, researchLevel);
+    return [
+      { label: '効果対象',       value: `稼働中の採集施設 ${activeCount} マス` },
+      { label: '精製研究レベル', value: `Lv.${researchLevel}` },
+      { label: '価値増加倍率',   value: `×${effectiveMultiplier.toFixed(2)}` },
+    ];
+  }
+
+  return [];
 }
 
 export type ResearchBreakdownItem = {

@@ -30,11 +30,9 @@ function generateDeposits(_index: PlotIndex): ResourceDeposit[] {
   ];
 }
 
-export function generatePlots(): readonly [Plot, Plot, Plot, Plot, Plot, Plot, Plot, Plot, Plot] {
-  const plots = PLOT_INDICES.map((index): Plot => ({
-    index,
+export function generatePlots(): readonly Plot[] {
+  return PLOT_INDICES.map((index): Plot => ({
     deposits: generateDeposits(index),
     facilityId: null,
   }));
-  return plots as [Plot, Plot, Plot, Plot, Plot, Plot, Plot, Plot, Plot];
 }

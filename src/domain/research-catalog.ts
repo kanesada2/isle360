@@ -1,21 +1,23 @@
-import type { ResourcePhase } from './types';
+import type { ResearchId, ResourcePhase } from './types';
 
 export type ResearchCatalogEntry = {
-  key: string;
+  key: ResearchId;
   name: string;
   description: string;
   baseCost: number;
   /** true の場合、研究するたびにコストが 50% 増加 */
   repeatable: boolean;
   /** 前提研究のキー一覧 */
-  prerequisites: string[];
+  prerequisites: ResearchId[];
   /** この研究を完了するとアンロックされる資源フェーズ */
   unlocksPhase?: ResourcePhase;
 };
 
+const r = (s: string) => s as ResearchId;
+
 export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
   {
-    key: "agri-efficiency",
+    key: r("agri-efficiency"),
     name: "農産物採集効率上昇",
     description:
       "農場の採集速度が 20% 向上する。繰り返し研究するたびにさらに 20% 積み重ねられるが、研究コストは毎回 50% 増加する。",
@@ -24,45 +26,45 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     prerequisites: [],
   },
   {
-    key: "mineral-survey",
+    key: r("mineral-survey"),
     name: "鉱物調査",
     description:
       "各マスの鉱物埋蔵量が可視化され、鉱山の建設が可能になる。農産物採集効率上昇の研究完了が前提。",
     baseCost: 200,
     repeatable: false,
-    prerequisites: ["agri-efficiency"],
+    prerequisites: [r("agri-efficiency")],
     unlocksPhase: 2,
   },
   {
-    key: "mineral-efficiency",
+    key: r("mineral-efficiency"),
     name: "鉱物採掘効率向上",
     description:
       "鉱山の採掘速度が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加。鉱物調査の完了が前提。",
     baseCost: 200,
     repeatable: true,
-    prerequisites: ["mineral-survey"],
+    prerequisites: [r("mineral-survey")],
   },
   {
-    key: "energy-survey",
+    key: r("energy-survey"),
     name: "エネルギー資源調査",
     description:
       "各マスのエネルギー資源埋蔵量が可視化され、エネルギー生産場の建設が可能になる。鉱物採掘効率向上の研究完了が前提。",
     baseCost: 300,
     repeatable: false,
-    prerequisites: ["mineral-efficiency"],
+    prerequisites: [r("mineral-efficiency")],
     unlocksPhase: 3,
   },
   {
-    key: "energy-efficiency",
+    key: r("energy-efficiency"),
     name: "エネルギー獲得効率向上",
     description:
       "エネルギー生産場の速度が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加。エネルギー資源調査の完了が前提。",
     baseCost: 300,
     repeatable: true,
-    prerequisites: ["energy-survey"],
+    prerequisites: [r("energy-survey")],
   },
   {
-    key: "refinery-efficiency",
+    key: r("refinery-efficiency"),
     name: "精製技術向上",
     description:
       "精製工場によって高まる付加価値が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加する。",
@@ -71,7 +73,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     prerequisites: [],
   },
   {
-    key: "construction-efficiency",
+    key: r("construction-efficiency"),
     name: "建築技術向上",
     description:
       "施設の建造・破壊にかかる時間が 10% 短縮される。繰り返し研究可能だがコストは毎回 50% 増加する。",
@@ -79,4 +81,4 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     repeatable: true,
     prerequisites: [],
   },
-] as const;
+];

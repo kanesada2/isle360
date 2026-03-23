@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { runOnJS } from 'react-native-worklets';
 
 import { BuildModal } from '@/components/build-modal';
-import { FacilityDetailModal, type DetailRow } from '@/components/facility-detail-modal';
+import { FacilityDetailModal } from '@/components/facility-detail-modal';
 import { PhaseResourceBar } from '@/components/phase-resource-bar';
 import { ResearchModal } from '@/components/research-modal';
 import { ResultModal } from '@/components/result-modal';
@@ -17,7 +17,9 @@ import {
   buildFacility,
   computeScore,
   demolishFacility,
+  getFacilityDetailRows,
   getFacilityDisplayName,
+  startGame,
   startResearch,
   tickFacilities,
 } from '@/domain/facility-actions';
@@ -25,7 +27,7 @@ import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
 import { createGame } from '@/domain/game';
 import type { ResearchCatalogEntry } from '@/domain/research-catalog';
 import { getAvailableFacilityKeys, getUnlockedPhases } from '@/domain/research-unlock';
-import type { FacilityId, Game, PlotIndex, ResearchId, ResourcePhase } from '@/domain/types';
+import type { Game, PlotIndex, ResourcePhase } from '@/domain/types';
 import { useGameLoop } from '@/hooks/use-game-loop';
 
 const SESSION_DURATION_MS = 360_000;
@@ -40,30 +42,25 @@ export default function GameScreen() {
     createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS }),
   );
 
-  const [startedAt, setStartedAt] = useState<number | null>(null);
-  const gameStarted = startedAt !== null;
-
+  const gameStarted = game.status !== 'setup';
   const gameFinished = game.status === 'finished';
 
   const [now, setNow] = useState(() => Date.now());
   useGameLoop((currentNow) => {
     setNow(currentNow);
     setGame((g) => tickFacilities(g, currentNow));
-  }, gameStarted && !gameFinished);
+  }, game.status === 'playing');
 
   const remaining =
-    startedAt !== null
-      ? Math.max(0, game.sessionDurationMs - (now - startedAt))
+    game.startedAt !== null
+      ? Math.max(0, game.sessionDurationMs - (now - game.startedAt))
       : game.sessionDurationMs;
 
   // 残り時間が 0 になったらゲーム終了
   useEffect(() => {
     if (!gameStarted || gameFinished) return;
     if (remaining === 0) {
-      setGame((g) => {
-        const b = computeScore(g);
-        return { ...g, status: 'finished', score: b.total };
-      });
+      setGame((g) => ({ ...g, status: 'finished' }));
     }
   }, [remaining, gameStarted, gameFinished]);
 
@@ -77,8 +74,7 @@ export default function GameScreen() {
 
   const scoreBreakdown = useMemo(
     () => computeScore(game),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gameFinished],
+    [gameFinished], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // ── プロットナビゲーション ────────────────────────────────────
@@ -148,13 +144,13 @@ export default function GameScreen() {
   );
 
   const handleStart = useCallback(() => {
-    setStartedAt(Date.now());
-    setNow(Date.now());
+    const now = Date.now();
+    setGame((g) => startGame(g, now));
+    setNow(now);
   }, []);
 
   const handleRestart = useCallback(() => {
     setGame(createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS }));
-    setStartedAt(null);
     setNow(Date.now());
     setSelectedPlotIndex(4);
     currentIndexSv.value = 4;
@@ -163,7 +159,6 @@ export default function GameScreen() {
   const [buildModalVisible, setBuildModalVisible] = useState(false);
   const [facilityDetailVisible, setFacilityDetailVisible] = useState(false);
   const [labModalVisible, setLabModalVisible] = useState(false);
-  const [labFacilityId, setLabFacilityId] = useState<FacilityId | null>(null);
 
   // 現在選択中の plot の施設（なければ undefined）
   const currentFacility = useMemo(() => {
@@ -171,42 +166,12 @@ export default function GameScreen() {
     return facilityId ? game.facilities.get(facilityId) : undefined;
   }, [game.plots, game.facilities, selectedPlotIndex]);
 
-  const facilityDetailRows = useMemo((): DetailRow[] => {
-    if (!currentFacility || currentFacility.state !== 'idle') return [];
-
-    if (currentFacility.kind === 'extractor') {
-      const keyMap: Record<string, ResearchId> = {
-        agriculture: 'agri-efficiency' as ResearchId,
-        mineral:     'mineral-efficiency' as ResearchId,
-        energy:      'energy-efficiency' as ResearchId,
-      };
-      const level = game.player.completedResearch.get(keyMap[currentFacility.resourceType]) ?? 0;
-      const multiplier = Math.pow(1.2, level);
-      return [
-        { label: '研究レベル',     value: `Lv.${level}` },
-        { label: '採掘倍率',       value: `×${multiplier.toFixed(2)}` },
-        { label: '採掘量/サイクル', value: (currentFacility.outputPerCycle * multiplier).toFixed(2) },
-        { label: 'サイクル間隔',   value: `${currentFacility.cycleDurationMs / 1000} 秒` },
-      ];
-    }
-
-    if (currentFacility.kind === 'refinery') {
-      const activeCount = game.plots.filter((p) => {
-        if (!p.facilityId) return false;
-        const f = game.facilities.get(p.facilityId);
-        return f?.kind === 'extractor' && f.state === 'idle';
-      }).length;
-      const researchLevel = game.player.completedResearch.get('refinery-efficiency' as ResearchId) ?? 0;
-      const effectiveMultiplier = currentFacility.valueMultiplier * Math.pow(1.2, researchLevel);
-      return [
-        { label: '効果対象',       value: `稼働中の採集施設 ${activeCount} マス` },
-        { label: '精製研究レベル', value: `Lv.${researchLevel}` },
-        { label: '価値増加倍率',   value: `×${effectiveMultiplier.toFixed(2)}` },
-      ];
-    }
-
-    return [];
-  }, [currentFacility, game.player.completedResearch, game.plots, game.facilities]);
+  const facilityDetailRows = useMemo(
+    () => currentFacility
+      ? getFacilityDetailRows(currentFacility, game.plots, game.facilities, game.player.completedResearch)
+      : [],
+    [currentFacility, game.plots, game.facilities, game.player.completedResearch],
+  );
 
   const handleFacilityTap = useCallback(() => {
     if (!gameStarted) return;
@@ -219,8 +184,7 @@ export default function GameScreen() {
     }
     if (currentFacility.kind === 'laboratory') {
       if (currentFacility.state === 'idle' || currentFacility.state === 'processing') {
-        setLabFacilityId(currentFacility.id);
-        InteractionManager.runAfterInteractions().then(() =>setLabModalVisible(true));
+        InteractionManager.runAfterInteractions().then(() => setLabModalVisible(true));
       }
     } else if (
       currentFacility.state === 'idle' &&
@@ -378,18 +342,15 @@ export default function GameScreen() {
         completedResearch={game.player.completedResearch}
         funds={game.player.funds}
         onResearch={(entry: ResearchCatalogEntry) => {
-          if (!labFacilityId) return;
-          setGame((g) => startResearch(g, labFacilityId, entry, Date.now()));
+          const facilityId = game.plots[selectedPlotIndex].facilityId;
+          if (!facilityId) return;
+          setGame((g) => startResearch(g, facilityId, entry, Date.now()));
         }}
         onDemolish={() => {
           setLabModalVisible(false);
           handleDemolish();
         }}
-        labProcessing={
-          labFacilityId
-            ? game.facilities.get(labFacilityId)?.state === 'processing'
-            : false
-        }
+        labProcessing={currentFacility?.state === 'processing'}
       />
       {/* ゲームスタートオーバーレイ（スワイプは背後のGestureDetectorへ通過） */}
       {!gameStarted && <StartOverlay onStart={handleStart} />}
