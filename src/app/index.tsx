@@ -14,13 +14,9 @@ import { StartOverlay } from '@/components/start-overlay';
 import { TimerBar } from '@/components/timer-bar';
 import { Colors, Spacing } from '@/constants/theme';
 import {
-  BUILD_DURATION_MS,
-  DEMOLISH_DURATION_MS,
-  RESEARCH_DURATION_MS,
   buildFacility,
   computeScore,
   demolishFacility,
-  getAdjacentIndices,
   getFacilityDisplayName,
   startResearch,
   tickFacilities,
@@ -78,6 +74,12 @@ export default function GameScreen() {
     setFacilityDetailVisible(false);
     setLabModalVisible(false);
   }, [gameFinished]);
+
+  const scoreBreakdown = useMemo(
+    () => computeScore(game),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gameFinished],
+  );
 
   // ── プロットナビゲーション ────────────────────────────────────
   const [selectedPlotIndex, setSelectedPlotIndex] = useState<PlotIndex>(4);
@@ -394,7 +396,7 @@ export default function GameScreen() {
       {/* リザルトモーダル */}
       <ResultModal
         visible={gameFinished}
-        breakdown={computeScore(game)}
+        breakdown={scoreBreakdown}
         onRestart={handleRestart}
       />
     </SafeAreaView>

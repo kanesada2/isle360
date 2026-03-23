@@ -12,7 +12,6 @@ export function createGame({ sessionDurationMs, initialFunds }: CreateGameParams
     id: newPlayerId(),
     funds: initialFunds,
     completedResearch: new Map(),
-    activeResearchJobs: [],
   };
 
   return {

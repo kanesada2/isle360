@@ -65,26 +65,6 @@ export function getFacilityDisplayName(facility: Facility): string {
 }
 
 /**
- * 上下左右に隣接するプロットのインデックスを返す（3×3 グリッド）。
- */
-export function getAdjacentIndices(index: PlotIndex): PlotIndex[] {
-  const row = Math.floor(index / 3);
-  const col = index % 3;
-  const adjacent: PlotIndex[] = [];
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const r = row + dr;
-      const c = col + dc;
-      if (r >= 0 && r < 3 && c >= 0 && c < 3) {
-        adjacent.push((r * 3 + c) as PlotIndex);
-      }
-    }
-  }
-  return adjacent;
-}
-
-/**
  * 効率研究によるレベルから採掘倍率を計算する。
  * 対応する効率研究 1 レベルごとに +20%（複利）。
  */
@@ -171,13 +151,10 @@ export function buildFacility(
       };
       break;
     case 'refinery':
-      facility = { ...base, kind: 'refinery', valueMultiplier: 1.2, cycleDurationMs: 8_000 };
+      facility = { ...base, kind: 'refinery', valueMultiplier: 1.2 };
       break;
     case 'laboratory':
-      facility = { ...base, kind: 'laboratory', researchSpeedMultiplier: 1.0, activeResearchId: null };
-      break;
-    case 'booster':
-      facility = { ...base, kind: 'booster', efficiencyBonus: 0.2, affectedIndices: [] };
+      facility = { ...base, kind: 'laboratory', activeResearchId: null };
       break;
     case 'monument':
       facility = { ...base, kind: 'monument' } as Monument;

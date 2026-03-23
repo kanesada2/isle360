@@ -72,7 +72,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     kind: "monument",
     name: "繁栄の象徴",
     description:
-      "島の繁栄を示す建造物。一つの建設が完了するまで、次を建設開始できない。スコアに大きく貢献する。p",
+      "島の繁栄を示す建造物。一つの建設が完了するまで、次を建設開始できない。スコアに大きく貢献する。",
     buildCost: 3000,
     demolishCost: 0,
   },

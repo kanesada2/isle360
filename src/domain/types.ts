@@ -58,21 +58,12 @@ export type Extractor = FacilityBase & {
 export type Refinery = FacilityBase & {
   kind:            "refinery";
   valueMultiplier: number;
-  cycleDurationMs: number;
 };
 
 // Laboratory: ラボ（複数建てると研究を並列・加速できる）
 export type Laboratory = FacilityBase & {
-  kind:                    "laboratory";
-  researchSpeedMultiplier: number;
-  activeResearchId:        ResearchId | null;
-};
-
-// Booster: 効率増幅施設（無産・周囲に効果）
-export type Booster = FacilityBase & {
-  kind:            "booster";
-  efficiencyBonus: number;  // 加算値
-  affectedIndices: PlotIndex[];
+  kind:             "laboratory";
+  activeResearchId: ResearchId | null;
 };
 
 // Monument: 特殊な建造物（高コスト・長時間建設）
@@ -80,41 +71,13 @@ export type Monument = FacilityBase & {
   kind: "monument";
 };
 
-export type Facility = Extractor | Refinery | Laboratory | Booster | Monument;
-
-// ── Research Effect（研究の効果）─────────────────────────────────
-export type ResearchEffect =
-  | { kind: "extractorEfficiency"; resourceType: ResourceType; multiplier: number }
-  | { kind: "refineryEfficiency";  multiplier: number }
-  | { kind: "researchSpeed";       multiplier: number }
-  | { kind: "unlockPhase";         phase: ResourcePhase };
-
-// ── Research（研究ノード）────────────────────────────────────────
-export type Research = {
-  id:              ResearchId;
-  label:           string;
-  effect:          ResearchEffect;
-  prerequisites:   ResearchId[];  // これが全てcompleteになるまで着手不可
-  baseCost:        number;        // 繰り返し研究時はゲームロジック側でコストを逓増させる
-  baseDurationMs:  number;
-  maxLevel:        number;        // unlock系は1、efficiency系は複数
-};
-
-// ── Research Job（進行中の研究）──────────────────────────────────
-export type ResearchJob = {
-  researchId:           ResearchId;
-  targetLevel:          number;
-  startedAt:            number;
-  endsAt:               number;
-  contributingLabCount: number;  // ラボ棟数で短縮される
-};
+export type Facility = Extractor | Refinery | Laboratory | Monument;
 
 // ── Player ───────────────────────────────────────────────────────
 export type Player = {
-  id:                 PlayerId;
-  funds:              number;
-  completedResearch:  Map<ResearchId, number>;  // researchId → 到達レベル
-  activeResearchJobs: ResearchJob[];            // 並列研究（ラボ複数時）
+  id:                PlayerId;
+  funds:             number;
+  completedResearch: Map<ResearchId, number>;  // researchId → 到達レベル
 };
 
 // ── Game（セッション全体）────────────────────────────────────────
