@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { generatePlots } from "./plot";
-import { createRng } from "./rng";
+import { generatePlots } from "../../src/domain/plot";
+import { createRng } from "../../src/domain/rng";
 
 const RUNS = 1000;
 
