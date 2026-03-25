@@ -178,7 +178,7 @@ export default function GameScreen() {
 
   const handleFacilityTap = useCallback(() => {
     if (gameFinished) {
-      setResultVisible(true);
+      InteractionManager.runAfterInteractions().then(() =>setResultVisible(true));
       return;
     }
     if (!gameStarted) return;
