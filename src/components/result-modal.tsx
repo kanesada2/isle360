@@ -8,6 +8,7 @@ type Props = {
   visible: boolean;
   breakdown: ScoreBreakdown;
   onRestart: () => void;
+  onClose?: () => void;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -16,14 +17,14 @@ const RESOURCE_LABELS: Record<string, string> = {
   energy: 'エネルギー',
 };
 
-export function ResultModal({ visible, breakdown, onRestart }: Props) {
+export function ResultModal({ visible, breakdown, onRestart, onClose }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.backdrop}>
-        <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={[styles.card, { backgroundColor: colors.backgroundElement }]} onPress={() => {}}>
           <Text style={[styles.title, { color: colors.text }]}>ゲーム終了</Text>
 
           <View style={[styles.scoreBox, { backgroundColor: colors.background }]}>
@@ -84,8 +85,8 @@ export function ResultModal({ visible, breakdown, onRestart }: Props) {
               もう一度プレイ
             </Text>
           </Pressable>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }

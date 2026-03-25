@@ -81,6 +81,21 @@ export type Player = {
   completedResearch: Map<ResearchId, number>;  // researchId → 到達レベル
 };
 
+// ── GameLog ───────────────────────────────────────────────────
+export type GameEventKind =
+  | "construction-complete"
+  | "demolish-start"
+  | "research-complete";
+
+export type GameLogEntry = {
+  kind:            GameEventKind;
+  elapsedMs:       number;   // ゲーム開始からの経過時間（ms）
+  score:           number;   // その時点の総スコア
+  fundsPerSecond:  number;   // その時点の資金/秒
+  facilityKind?:   Facility["kind"];  // 建設完了・破壊開始時
+  researchKey?:    string;            // 研究完了時
+};
+
 // ── Game（セッション全体）────────────────────────────────────────
 export type GameStatus = "setup" | "playing" | "finished";
 
@@ -92,4 +107,5 @@ export type Game = {
   sessionDurationMs: number;
   startedAt:         number | null;
   status:            GameStatus;
+  logs:              GameLogEntry[];
 };

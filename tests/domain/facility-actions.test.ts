@@ -6,6 +6,7 @@ import {
   startResearch,
   getResearchCost,
   computeScore,
+  computeFundsPerSecond,
   BUILD_DURATION_MS,
   DEMOLISH_DURATION_MS,
   RESEARCH_DURATION_MS,
@@ -45,6 +46,7 @@ function makeGame(
     sessionDurationMs: 360_000,
     startedAt: NOW,
     status: "playing",
+    logs: [],
   };
 }
 
@@ -632,6 +634,7 @@ describe("鉱物活用建築", () => {
       sessionDurationMs: 360_000,
       startedAt: NOW,
       status: "playing",
+      logs: [],
     };
   }
 
@@ -814,5 +817,85 @@ describe("computeScore", () => {
 
     // floor(50.7) + 100 + 5000 = 50 + 100 + 5000 = 5150
     expect(score.total).toBe(5150);
+  });
+});
+
+// ── ゲームログ ────────────────────────────────────────────────
+
+describe("ゲームログ", () => {
+  it("初期状態ではログが空", () => {
+    expect(makeGame().logs).toHaveLength(0);
+  });
+
+  it("建設完了時に construction-complete ログが追加される", () => {
+    let game = makeGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+
+    expect(game.logs).toHaveLength(1);
+    expect(game.logs[0].kind).toBe("construction-complete");
+    expect(game.logs[0].facilityKind).toBe("extractor");
+  });
+
+  it("demolishFacility 呼び出し時に demolish-start ログが追加される", () => {
+    let game = makeGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    game = demolishFacility(game, 0, NOW + BUILD_DURATION_MS);
+
+    expect(game.logs).toHaveLength(2); // construction-complete + demolish-start
+    expect(game.logs[1].kind).toBe("demolish-start");
+    expect(game.logs[1].facilityKind).toBe("extractor");
+  });
+
+  it("研究完了時に research-complete ログが追加される", () => {
+    let game = makeGame(5000);
+    game = buildFacility(game, 0, LAB_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    const labId = game.plots[0].facilityId!;
+    game = startResearch(game, labId, AGRI_RESEARCH, NOW + BUILD_DURATION_MS);
+    const logsBefore = game.logs.length;
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + RESEARCH_DURATION_MS);
+
+    const researchLog = game.logs.find((l) => l.kind === "research-complete");
+    expect(researchLog).toBeDefined();
+    expect(researchLog!.researchKey).toBe("agri-efficiency");
+    expect(game.logs.length).toBe(logsBefore + 1);
+  });
+
+  it("各ログエントリに elapsedMs / score / fundsPerSecond が記録される", () => {
+    let game = makeGame(5000);
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+
+    const log = game.logs[0];
+    expect(log.elapsedMs).toBe(BUILD_DURATION_MS);
+    expect(typeof log.score).toBe("number");
+    expect(typeof log.fundsPerSecond).toBe("number");
+  });
+
+  it("稼働中の Extractor がある場合 fundsPerSecond > 0 が記録される", () => {
+    let game = makeGame(5000);
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    game = buildFacility(game, 1, LAB_ENTRY, NOW + BUILD_DURATION_MS);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS * 2);
+
+    const labLog = game.logs.find(
+      (l) => l.kind === "construction-complete" && l.facilityKind === "laboratory",
+    )!;
+    expect(labLog.fundsPerSecond).toBeGreaterThan(0);
+  });
+
+  it("computeFundsPerSecond: 稼働中 Extractor なしなら 0", () => {
+    expect(computeFundsPerSecond(makeGame())).toBe(0);
+  });
+
+  it("computeFundsPerSecond: idle の農場1基（phase1, no refinery）は 5 G/s", () => {
+    let game = makeGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    // 1 unit/cycle × 1000ms/s ÷ 200ms/cycle × phase1 = 5
+    expect(computeFundsPerSecond(game)).toBe(5);
   });
 });

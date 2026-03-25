@@ -2,7 +2,7 @@ import type { FacilityCatalogEntry } from './facility-catalog';
 import { FACILITY_CATALOG } from './facility-catalog';
 import { newFacilityId } from './id';
 import { RESEARCH_CATALOG, type ResearchCatalogEntry } from './research-catalog';
-import type { Extractor, Facility, FacilityId, Game, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
+import type { Extractor, Facility, FacilityId, Game, GameLogEntry, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
 
 export const BUILD_DURATION_MS = 20_000;
 export const DEMOLISH_DURATION_MS = 10_000;
@@ -141,6 +141,20 @@ function calcRefineryMultiplier(
   return multiplier;
 }
 
+/** ログエントリを生成する内部ヘルパー */
+function makeLogEntry(
+  game: Game,
+  now: number,
+  fields: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'researchKey'>,
+): GameLogEntry {
+  return {
+    ...fields,
+    elapsedMs:      game.startedAt !== null ? now - game.startedAt : 0,
+    score:          computeScore(game).total,
+    fundsPerSecond: computeFundsPerSecond(game),
+  };
+}
+
 /** ゲームを開始する（status: playing、startedAt を設定） */
 export function startGame(game: Game, now: number): Game {
   return { ...game, status: 'playing', startedAt: now };
@@ -219,8 +233,13 @@ export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number):
     ...game.player,
     funds: game.player.funds - facility.demolishCost,
   };
+  const stateAfter = { ...game, player: newPlayer, facilities: newFacilities };
+  const logEntry = makeLogEntry(stateAfter, now, {
+    kind: 'demolish-start',
+    facilityKind: facility.kind,
+  });
 
-  return { ...game, player: newPlayer, facilities: newFacilities };
+  return { ...stateAfter, logs: [...game.logs, logEntry] };
 }
 
 /**
@@ -234,6 +253,7 @@ export function tickFacilities(game: Game, now: number): Game {
   const newFacilities = new Map(game.facilities);
   let newPlots: readonly Plot[] = game.plots;
   let newPlayer = game.player;
+  const pendingEvents: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'researchKey'>[] = [];
 
   for (const [id, facility] of game.facilities) {
     // ── 建設・破壊ジョブの完了チェック ──────────────────────────
@@ -247,6 +267,7 @@ export function tickFacilities(game: Game, now: number): Game {
           } else {
             newFacilities.set(id, { ...facility, state: 'idle' as const, currentJob: null });
           }
+          pendingEvents.push({ kind: 'construction-complete', facilityKind: facility.kind });
           changed = true;
           continue; // 同フレームで採掘処理はしない
         } else if (facility.state === 'processing' && facility.kind === 'laboratory') {
@@ -256,6 +277,7 @@ export function tickFacilities(game: Game, now: number): Game {
             const currentLevel = newCompletedResearch.get(lab.activeResearchId) ?? 0;
             newCompletedResearch.set(lab.activeResearchId, currentLevel + 1);
             newPlayer = { ...newPlayer, completedResearch: newCompletedResearch };
+            pendingEvents.push({ kind: 'research-complete', researchKey: lab.activeResearchId as string });
           }
           newFacilities.set(id, {
             ...lab,
@@ -365,7 +387,12 @@ export function tickFacilities(game: Game, now: number): Game {
   }
 
   if (!changed) return game;
-  return { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
+
+  const nextGame = { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
+  if (pendingEvents.length === 0) return nextGame;
+
+  const newLogs = pendingEvents.map((ev) => makeLogEntry(nextGame, now, ev));
+  return { ...nextGame, logs: [...game.logs, ...newLogs] };
 }
 
 export type FacilityDetailRow = { label: string; value: string };
@@ -427,6 +454,31 @@ export type ScoreBreakdown = {
   monumentBonus: number;
   monumentCount: number;
 };
+
+/**
+ * 現時点で稼働中の全 Extractor による資金/秒を返す。
+ */
+export function computeFundsPerSecond(game: Game): number {
+  let total = 0;
+  for (const [, facility] of game.facilities) {
+    if (facility.state !== 'idle' || facility.kind !== 'extractor') continue;
+    const extractor = facility as Extractor;
+    const deposit = game.plots[extractor.plotIndex].deposits.find(
+      (d) => d.type === extractor.resourceType,
+    );
+    if (!deposit || deposit.current <= 0) continue;
+    const extractMult = getExtractionMultiplier(extractor.resourceType, game.player.completedResearch);
+    const unitsPerSec = (extractor.outputPerCycle * extractMult) / (extractor.cycleDurationMs / 1000);
+    const refineryMult = calcRefineryMultiplier(
+      extractor.plotIndex,
+      game.plots,
+      game.facilities,
+      game.player.completedResearch,
+    );
+    total += unitsPerSec * deposit.phase * refineryMult;
+  }
+  return Math.round(total * 100) / 100;
+}
 
 /**
  * ゲーム終了時のスコア内訳を計算する。

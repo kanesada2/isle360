@@ -64,12 +64,15 @@ export default function GameScreen() {
     }
   }, [remaining, gameStarted, gameFinished]);
 
-  // ゲーム終了時に全モーダルを閉じる
+  const [resultVisible, setResultVisible] = useState(false);
+
+  // ゲーム終了時に全モーダルを閉じ、リザルトを表示する
   useEffect(() => {
     if (!gameFinished) return;
     setBuildModalVisible(false);
     setFacilityDetailVisible(false);
     setLabModalVisible(false);
+    setResultVisible(true);
   }, [gameFinished]);
 
   const scoreBreakdown = useMemo(
@@ -174,6 +177,10 @@ export default function GameScreen() {
   );
 
   const handleFacilityTap = useCallback(() => {
+    if (gameFinished) {
+      setResultVisible(true);
+      return;
+    }
     if (!gameStarted) return;
     // InteractionManager.runAfterInteractions でモーダル開放を全インタラクション完了後に遅延し、
     // 現在のタッチイベント処理が完全に終わってからモーダルを開く。
@@ -192,7 +199,7 @@ export default function GameScreen() {
     ) {
       InteractionManager.runAfterInteractions().then(() =>setFacilityDetailVisible(true));
     }
-  }, [gameStarted, currentFacility]);
+  }, [gameFinished, gameStarted, currentFacility]);
 
   // ゲームループで currentFacility が毎フレーム更新されても
   // tapGesture を再生成しないよう ref 経由で最新の関数を保持する
@@ -357,9 +364,10 @@ export default function GameScreen() {
       {!gameStarted && <StartOverlay onStart={handleStart} />}
       {/* リザルトモーダル */}
       <ResultModal
-        visible={gameFinished}
+        visible={resultVisible}
         breakdown={scoreBreakdown}
         onRestart={handleRestart}
+        onClose={() => setResultVisible(false)}
       />
     </SafeAreaView>
   );

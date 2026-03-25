@@ -22,5 +22,6 @@ export function createGame({ sessionDurationMs, initialFunds }: CreateGameParams
     sessionDurationMs,
     startedAt: null,
     status: "setup",
+    logs: [],
   };
 }
