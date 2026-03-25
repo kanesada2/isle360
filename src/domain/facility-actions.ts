@@ -9,6 +9,10 @@ export const DEMOLISH_DURATION_MS = 10_000;
 export const RESEARCH_DURATION_MS = 15_000;
 
 const r = (s: string) => s as ResearchId;
+const SUSTAINABLE_FARMING_KEY      = r('sustainable-farming');
+const REGEN_EFFICIENCY_KEY         = r('regen-efficiency');
+const ALTERNATIVE_BUILDING_KEY     = r('alternative-building');
+const ALTERNATIVITY_EFFICIENCY_KEY = r('alternativity-efficiency');
 
 /** ResourceType → 対応する採掘効率研究キー */
 export const EXTRACTION_RESEARCH_KEYS: Record<ResourceType, ResearchId> = {
@@ -47,10 +51,11 @@ export function startResearch(
   if (game.player.funds < cost) return game;
 
   const newFacilities = new Map(game.facilities);
+  const durationMs = entry.researchDurationMs ?? RESEARCH_DURATION_MS;
   newFacilities.set(facilityId, {
     ...(facility as Laboratory),
     state: 'processing' as const,
-    currentJob: { startedAt: now, durationMs: RESEARCH_DURATION_MS },
+    currentJob: { startedAt: now, durationMs },
     activeResearchId: entry.key,
   });
 
@@ -91,6 +96,22 @@ function getExtractionMultiplier(
 function getConstructionMultiplier(completedResearch: Map<ResearchId, number>): number {
   const level = completedResearch.get(CONSTRUCTION_EFFICIENCY_KEY) ?? 0;
   return Math.pow(0.9, level);
+}
+
+/**
+ * 鉱物活用建築による建設コスト割引率を返す（0〜1）。
+ * 割引率 = mineral_abundance × 0.0002 × 1.2^(alternativity-efficiency レベル)、上限1.0。
+ */
+function getMineralBuildDiscountRate(
+  plotIndex: PlotIndex,
+  plots: Game['plots'],
+  completedResearch: Map<ResearchId, number>,
+): number {
+  if ((completedResearch.get(ALTERNATIVE_BUILDING_KEY) ?? 0) === 0) return 0;
+  const mineralDeposit = plots[plotIndex].deposits.find((d) => d.type === 'mineral');
+  if (!mineralDeposit) return 0;
+  const effLevel = completedResearch.get(ALTERNATIVITY_EFFICIENCY_KEY) ?? 0;
+  return Math.min(1, mineralDeposit.abundance * 0.0002 * Math.pow(1.2, effLevel));
 }
 
 function getRefineryResearchMultiplier(completedResearch: Map<ResearchId, number>): number {
@@ -170,9 +191,11 @@ export function buildFacility(
   const newPlots: Plot[] = game.plots.map((p, i) =>
     i === plotIndex ? { ...p, facilityId } : p,
   );
+  const discountRate = getMineralBuildDiscountRate(plotIndex, game.plots, game.player.completedResearch);
+  const actualCost = Math.round(entry.buildCost * (1 - discountRate));
   const newPlayer = {
     ...game.player,
-    funds: game.player.funds - entry.buildCost,
+    funds: game.player.funds - actualCost,
   };
 
   return { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
@@ -276,7 +299,11 @@ export function tickFacilities(game: Game, now: number): Game {
 
     // デポジット更新
     const newDeposits = plot.deposits.map((d, i) =>
-      i === depositIdx ? { ...d, current: Math.round((d.current - actualExtract) * 100) / 100 } : d,
+      i === depositIdx ? {
+        ...d,
+        current:    Math.round((d.current    - actualExtract) * 100) / 100,
+        totalMined: Math.round((d.totalMined + actualExtract) * 100) / 100,
+      } : d,
     );
     newPlots = newPlots.map((p, i) =>
       i === extractor.plotIndex ? { ...p, deposits: newDeposits } : p,
@@ -301,6 +328,40 @@ export function tickFacilities(game: Game, now: number): Game {
       lastCycleAt: extractor.lastCycleAt + cyclesElapsed * extractor.cycleDurationMs,
     });
     changed = true;
+  }
+
+  // ── 再生栽培：農産資源の自然再生 ────────────────────────────────
+  const sustainableLevel = newPlayer.completedResearch.get(SUSTAINABLE_FARMING_KEY) ?? 0;
+  if (sustainableLevel >= 1) {
+    newPlots = newPlots.map((plot) => {
+      const agriIdx = plot.deposits.findIndex((d) => d.type === 'agriculture');
+      if (agriIdx === -1) return plot;
+      const deposit = plot.deposits[agriIdx];
+
+      // 初回：タイマーを初期化するだけ（再生はしない）
+      if (deposit.lastRegenAt === undefined) {
+        changed = true;
+        return {
+          ...plot,
+          deposits: plot.deposits.map((d, i) => i === agriIdx ? { ...d, lastRegenAt: now } : d),
+        };
+      }
+
+      if (deposit.current >= deposit.abundance) return plot;
+
+      const deltaSec = (now - deposit.lastRegenAt) / 1000;
+      const regenLevel = newPlayer.completedResearch.get(REGEN_EFFICIENCY_KEY) ?? 0;
+      const regenMultiplier = Math.pow(1.2, regenLevel);
+      const regenAmount = deposit.abundance * 0.005 * regenMultiplier * deltaSec;
+      const newCurrent = Math.min(deposit.abundance, deposit.current + regenAmount);
+      changed = true;
+      return {
+        ...plot,
+        deposits: plot.deposits.map((d, i) =>
+          i === agriIdx ? { ...d, current: Math.round(newCurrent * 100) / 100, lastRegenAt: now } : d,
+        ),
+      };
+    });
   }
 
   if (!changed) return game;
@@ -375,9 +436,8 @@ export function computeScore(game: Game): ScoreBreakdown {
   const resourcesByType: Record<ResourceType, number> = { agriculture: 0, mineral: 0, energy: 0 };
   for (const plot of game.plots) {
     for (const deposit of plot.deposits) {
-      const mined = deposit.abundance - deposit.current;
-      resourcesMined += mined;
-      resourcesByType[deposit.type] += mined;
+      resourcesMined += deposit.totalMined;
+      resourcesByType[deposit.type] += deposit.totalMined;
     }
   }
 

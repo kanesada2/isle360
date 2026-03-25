@@ -11,6 +11,10 @@ export type ResearchCatalogEntry = {
   prerequisites: ResearchId[];
   /** この研究を完了するとアンロックされる資源フェーズ */
   unlocksPhase?: ResourcePhase;
+  /** 指定した場合、デフォルトの RESEARCH_DURATION_MS の代わりにこの時間（ms）を使用する */
+  researchDurationMs?: number;
+  /** true の場合、特別な研究としてUIで強調表示する */
+  special?: boolean;
 };
 
 const r = (s: string) => s as ResearchId;
@@ -80,5 +84,45 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     baseCost: 300,
     repeatable: true,
     prerequisites: [],
+  },
+  {
+    key: r("sustainable-farming"),
+    name: "再生栽培",
+    description:
+      "農産資源が自然再生するようになる。研究完了に60秒かかる。",
+    baseCost: 500,
+    repeatable: false,
+    prerequisites: [],
+    researchDurationMs: 60_000,
+    special: true,
+  },
+  {
+    key: r("regen-efficiency"),
+    name: "再生効率向上",
+    description:
+      "農産資源の再生速度が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加する。再生栽培の研究完了が前提。",
+    baseCost: 200,
+    repeatable: true,
+    prerequisites: [r("sustainable-farming")],
+  },
+  {
+    key: r("alternative-building"),
+    name: "鉱物活用建築",
+    description:
+      "そのマスに埋蔵された鉱物資源の量に応じて建築に必要な資金が減少する。研究完了に60秒かかる。",
+    baseCost: 500,
+    repeatable: false,
+    prerequisites: [],
+    researchDurationMs: 60_000,
+    special: true,
+  },
+  {
+    key: r("alternativity-efficiency"),
+    name: "鉱物活用率向上",
+    description:
+      "建築に必要な資源の減少率が20%向上する。繰り返し研究可能だがコストは毎回 50% 増加する。鉱物活用建築の研究完了が前提。",
+    baseCost: 200,
+    repeatable: true,
+    prerequisites: [r("alternative-building")],
   },
 ];

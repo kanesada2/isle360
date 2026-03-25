@@ -18,6 +18,8 @@ export type CatalogModalItem = {
   costLabel: string;
   /** true の場合、グレーアウト表示・実行不可（選択は可能） */
   disabled?: boolean;
+  /** true の場合、特別な研究として金色ボーダーで強調表示する */
+  special?: boolean;
 };
 
 type Props = {
@@ -74,23 +76,34 @@ export function CatalogModal({
             {items.map((item) => {
               const isSelected = item.key === selectedKey;
               const disabled = item.disabled ?? false;
+              const special = item.special ?? false;
               return (
                 <Pressable
                   key={item.key}
                   style={[
                     styles.listItem,
+                    special && styles.listItemSpecial,
                     {
                       backgroundColor: isSelected
-                        ? colors.backgroundSelected
-                        : colors.background,
-                      borderColor: isSelected ? colors.text : colors.backgroundSelected,
+                        ? (special ? '#3a2d00' : colors.backgroundSelected)
+                        : (special ? '#1a1400' : colors.background),
+                      borderColor: isSelected
+                        ? (special ? '#FFD700' : colors.text)
+                        : (special ? '#8B6914' : colors.backgroundSelected),
                       opacity: disabled ? 0.35 : 1,
                     },
                   ]}
                   onPress={() => onSelectKey(item.key)}
                 >
-                  <Text style={[styles.listItemName, { color: colors.text }]}>{item.name}</Text>
-                  <Text style={[styles.listItemCost, { color: colors.textSecondary }]}>
+                  <View style={styles.listItemLeft}>
+                    {special && (
+                      <Text style={styles.specialBadge}>✦</Text>
+                    )}
+                    <Text style={[styles.listItemName, { color: special ? '#FFD700' : colors.text }]}>
+                      {item.name}
+                    </Text>
+                  </View>
+                  <Text style={[styles.listItemCost, { color: special ? '#C9A227' : colors.textSecondary }]}>
                     {item.costLabel}
                   </Text>
                 </Pressable>
@@ -198,6 +211,18 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderRadius: Spacing.two,
     borderWidth: 1,
+  },
+  listItemSpecial: {
+    borderWidth: 2,
+  },
+  listItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  specialBadge: {
+    fontSize: 14,
+    color: '#FFD700',
   },
   listItemName: {
     fontSize: 15,

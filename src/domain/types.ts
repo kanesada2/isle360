@@ -12,10 +12,12 @@ export type ResourcePhase = 1 | 2 | 3;
 export type ResourceType = "agriculture" | "mineral" | "energy";
 
 export type ResourceDeposit = {
-  type:      ResourceType;
-  phase:     ResourcePhase;
-  abundance: number;  // 最大量（マップ表示のヒントにも使う）
-  current:   number;  // 現在の残量（採掘により減少）
+  type:         ResourceType;
+  phase:        ResourcePhase;
+  abundance:    number;  // 最大量（マップ表示のヒントにも使う）
+  current:      number;  // 現在の残量（採掘により減少）
+  totalMined:   number;  // 累積採掘量（再生分も含めた正確な採掘合計）
+  lastRegenAt?: number;  // 再生栽培研究後の最終再生時刻（ms）
   // 可視性は player.completedResearch から導出するため、ここには持たない
 };
 

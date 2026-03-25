@@ -14,9 +14,10 @@ type Props = {
   onDemolish?: () => void;
   demolishDisabled?: boolean;
   labProcessing?: boolean;
+  activeResearchId?: ResearchId | null;
 };
 
-export function ResearchModal({ visible, onClose, onResearch, completedResearch, funds, onDemolish, demolishDisabled, labProcessing }: Props) {
+export function ResearchModal({ visible, onClose, onResearch, completedResearch, funds, onDemolish, demolishDisabled, labProcessing, activeResearchId }: Props) {
   const [selectedKey, setSelectedKey] = useState<string>(RESEARCH_CATALOG[0].key);
   const selected = RESEARCH_CATALOG.find((e) => e.key === selectedKey) ?? RESEARCH_CATALOG[0];
 
@@ -27,12 +28,14 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
       (prereq) => (completedResearch.get(prereq as ResearchId) ?? 0) >= 1,
     );
     const cost = getResearchCost(e, completedResearch);
-    const nextLevel = (completedResearch.get(e.key as ResearchId) ?? 0) + 1;
+    const inProgress = activeResearchId === e.key ? 1 : 0;
+    const nextLevel = (completedResearch.get(e.key as ResearchId) ?? 0) + 1 + inProgress;
     return {
       key: e.key,
       name: e.repeatable ? `${e.name} Lv.${nextLevel}` : e.name,
       costLabel: e.repeatable ? `${cost.toLocaleString()} G〜` : `${cost.toLocaleString()} G`,
       disabled: !prerequisitesMet || cost > funds,
+      special: e.special ?? false,
     };
   });
 

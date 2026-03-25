@@ -351,6 +351,7 @@ export default function GameScreen() {
           handleDemolish();
         }}
         labProcessing={currentFacility?.state === 'processing'}
+        activeResearchId={currentFacility?.kind === 'laboratory' ? currentFacility.activeResearchId : null}
       />
       {/* ゲームスタートオーバーレイ（スワイプは背後のGestureDetectorへ通過） */}
       {!gameStarted && <StartOverlay onStart={handleStart} />}

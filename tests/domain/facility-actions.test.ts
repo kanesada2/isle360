@@ -31,9 +31,9 @@ function makeGame(
 ): Game {
   const plots: Plot[] = Array.from({ length: 9 }, () => ({
     deposits: [
-      { type: "agriculture" as const, phase: 1 as const, abundance: 1000, current: 1000 },
-      { type: "mineral" as const,     phase: 2 as const, abundance: 500,  current: 500  },
-      { type: "energy" as const,      phase: 3 as const, abundance: 300,  current: 300  },
+      { type: "agriculture" as const, phase: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
+      { type: "mineral" as const,     phase: 2 as const, abundance: 500,  current: 500,  totalMined: 0 },
+      { type: "energy" as const,      phase: 3 as const, abundance: 300,  current: 300,  totalMined: 0 },
     ],
     facilityId: null,
   }));
@@ -54,8 +54,11 @@ const REFINERY_ENTRY = FACILITY_CATALOG.find((e) => e.key === "refinery")!;
 const LAB_ENTRY      = FACILITY_CATALOG.find((e) => e.key === "laboratory")!;
 const MONUMENT_ENTRY = FACILITY_CATALOG.find((e) => e.key === "monument")!;
 
-const AGRI_RESEARCH  = RESEARCH_CATALOG.find((e) => e.key === "agri-efficiency")!;
-const MINERAL_SURVEY = RESEARCH_CATALOG.find((e) => e.key === "mineral-survey")!;
+const AGRI_RESEARCH           = RESEARCH_CATALOG.find((e) => e.key === "agri-efficiency")!;
+const MINERAL_SURVEY          = RESEARCH_CATALOG.find((e) => e.key === "mineral-survey")!;
+const SUSTAINABLE_FARMING     = RESEARCH_CATALOG.find((e) => e.key === "sustainable-farming")!;
+const ALTERNATIVE_BUILDING    = RESEARCH_CATALOG.find((e) => e.key === "alternative-building")!;
+const ALTERNATIVITY_EFFICIENCY = RESEARCH_CATALOG.find((e) => e.key === "alternativity-efficiency")!;
 
 // ── buildFacility ─────────────────────────────────────────────
 
@@ -382,6 +385,318 @@ describe("getAvailableFacilityKeys", () => {
   });
 });
 
+// ── 再生栽培 ──────────────────────────────────────────────────
+
+describe("再生栽培", () => {
+  function setupIdleLab(funds = 5000) {
+    let game = makeGame(funds);
+    game = buildFacility(game, 0, LAB_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    const labId = game.plots[0].facilityId!;
+    return { game, labId, researchStart: NOW + BUILD_DURATION_MS };
+  }
+
+  it("researchDurationMs が 60_000ms である", () => {
+    expect(SUSTAINABLE_FARMING.researchDurationMs).toBe(60_000);
+  });
+
+  it("special フラグが true である", () => {
+    expect(SUSTAINABLE_FARMING.special).toBe(true);
+  });
+
+  it("研究開始時のジョブ時間が researchDurationMs（60_000ms）になる", () => {
+    const { game: g0, labId, researchStart } = setupIdleLab(10_000);
+    const game = startResearch(g0, labId, SUSTAINABLE_FARMING, researchStart);
+    const lab = game.facilities.get(labId)!;
+    expect(lab.currentJob?.durationMs).toBe(60_000);
+  });
+
+  it("15_000ms 後のティックでは研究が完了しない（通常の RESEARCH_DURATION_MS より長い）", () => {
+    const { game: g0, labId, researchStart } = setupIdleLab(10_000);
+    let game = startResearch(g0, labId, SUSTAINABLE_FARMING, researchStart);
+    game = tickFacilities(game, researchStart + RESEARCH_DURATION_MS); // 15秒
+
+    expect(game.player.completedResearch.get(r("sustainable-farming"))).toBeUndefined();
+    expect(game.facilities.get(labId)!.state).toBe("processing");
+  });
+
+  it("60_000ms 後のティックで研究が完了し completedResearch に登録される", () => {
+    const { game: g0, labId, researchStart } = setupIdleLab(10_000);
+    let game = startResearch(g0, labId, SUSTAINABLE_FARMING, researchStart);
+    game = tickFacilities(game, researchStart + 60_000);
+
+    expect(game.player.completedResearch.get(r("sustainable-farming"))).toBe(1);
+    expect(game.facilities.get(labId)!.state).toBe("idle");
+  });
+
+  it("研究完了後、農産資源が abundance × 0.005 / 秒 のペースで再生する", () => {
+    // 農産資源を0まで枯渇させてから sustainable-farming を適用
+    let game = makeGame(10_000, research(["sustainable-farming", 1]));
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 0 } : d)) }
+          : p,
+      ),
+    };
+
+    // 1回目のティックで lastRegenAt が初期化される
+    game = tickFacilities(game, NOW);
+    // 1秒後のティック
+    game = tickFacilities(game, NOW + 1_000);
+
+    // abundance=1000, rate=0.005/s, 1s → +5
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(5, 1);
+  });
+
+  it("再生量は abundance を上限とする（上限を超えない）", () => {
+    let game = makeGame(10_000, research(["sustainable-farming", 1]));
+    // 農産資源がほぼ満タン（abundance=1000, current=999）
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 999 } : d)) }
+          : p,
+      ),
+    };
+
+    game = tickFacilities(game, NOW);             // lastRegenAt 初期化
+    game = tickFacilities(game, NOW + 10_000);    // 10秒後 → +50 になるが上限で1000
+
+    expect(game.plots[0].deposits[0].current).toBe(1000);
+  });
+
+  it("再生研究なしでは農産資源は再生しない", () => {
+    let game = makeGame(10_000);
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 0 } : d)) }
+          : p,
+      ),
+    };
+
+    game = tickFacilities(game, NOW);
+    game = tickFacilities(game, NOW + 10_000);
+
+    expect(game.plots[0].deposits[0].current).toBe(0);
+  });
+
+  it("農産以外の資源（mineral/energy）は再生しない", () => {
+    let game = makeGame(10_000, research(["sustainable-farming", 1]));
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? {
+              ...p,
+              deposits: p.deposits.map((d) => {
+                if (d.type === "mineral") return { ...d, current: 0 };
+                if (d.type === "energy")  return { ...d, current: 0 };
+                return d;
+              }),
+            }
+          : p,
+      ),
+    };
+
+    game = tickFacilities(game, NOW);
+    game = tickFacilities(game, NOW + 10_000);
+
+    const mineral = game.plots[0].deposits.find((d) => d.type === "mineral")!;
+    const energy  = game.plots[0].deposits.find((d) => d.type === "energy")!;
+    expect(mineral.current).toBe(0);
+    expect(energy.current).toBe(0);
+  });
+
+  it("再生ペースは abundance に比例する（abundance=500 なら +2.5/秒）", () => {
+    let game = makeGame(10_000, research(["sustainable-farming", 1]));
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, abundance: 500, current: 0 } : d)) }
+          : p,
+      ),
+    };
+
+    game = tickFacilities(game, NOW);
+    game = tickFacilities(game, NOW + 1_000);
+
+    // 500 × 0.005 × 1 = 2.5
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(2.5, 1);
+  });
+});
+
+// ── 再生効率向上 ──────────────────────────────────────────────
+
+describe("再生効率向上", () => {
+  const REGEN_RESEARCH = RESEARCH_CATALOG.find((e) => e.key === "regen-efficiency")!;
+
+  it("前提研究が sustainable-farming である", () => {
+    expect(REGEN_RESEARCH.prerequisites).toContain("sustainable-farming");
+  });
+
+  it("baseCost が 200 である", () => {
+    expect(REGEN_RESEARCH.baseCost).toBe(200);
+  });
+
+  it("繰り返し研究である", () => {
+    expect(REGEN_RESEARCH.repeatable).toBe(true);
+  });
+
+  it("regen-efficiency Lv1 で再生速度が 1.2 倍になる", () => {
+    let game = makeGame(10_000, research(["sustainable-farming", 1], ["regen-efficiency", 1]));
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 0 } : d)) }
+          : p,
+      ),
+    };
+
+    game = tickFacilities(game, NOW);
+    game = tickFacilities(game, NOW + 1_000);
+
+    // 1000 × 0.005 × 1.2^1 × 1s = 6
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(6, 1);
+  });
+
+  it("regen-efficiency Lv2 で再生速度が 1.44 倍になる", () => {
+    let game = makeGame(10_000, research(["sustainable-farming", 1], ["regen-efficiency", 2]));
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 0 } : d)) }
+          : p,
+      ),
+    };
+
+    game = tickFacilities(game, NOW);
+    game = tickFacilities(game, NOW + 1_000);
+
+    // 1000 × 0.005 × 1.2^2 × 1s = 7.2
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(7.2, 1);
+  });
+
+  it("sustainable-farming なしでは regen-efficiency があっても再生しない", () => {
+    let game = makeGame(10_000, research(["regen-efficiency", 1]));
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 0 } : d)) }
+          : p,
+      ),
+    };
+
+    game = tickFacilities(game, NOW);
+    game = tickFacilities(game, NOW + 1_000);
+
+    expect(game.plots[0].deposits[0].current).toBe(0);
+  });
+
+  it("コストはレベルに応じて 1.5 倍ずつ増加する（Lv0: 200, Lv1: 300, Lv2: 450）", () => {
+    const cr = new Map<ResearchId, number>();
+    expect(getResearchCost(REGEN_RESEARCH, cr)).toBe(200);
+    cr.set(r("regen-efficiency"), 1);
+    expect(getResearchCost(REGEN_RESEARCH, cr)).toBe(300);
+    cr.set(r("regen-efficiency"), 2);
+    expect(getResearchCost(REGEN_RESEARCH, cr)).toBe(450);
+  });
+});
+
+// ── 鉱物活用建築 ──────────────────────────────────────────────
+
+describe("鉱物活用建築", () => {
+  /** mineral abundance=500 の plot を持つゲームを生成するヘルパー */
+  function makeGameWithMineral(mineralAbundance: number, funds = 10_000, completedResearch = new Map<ResearchId, number>()): Game {
+    const plots: Plot[] = Array.from({ length: 9 }, (_, i) => ({
+      deposits: [
+        { type: "agriculture" as const, phase: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
+        { type: "mineral" as const,     phase: 2 as const, abundance: i === 0 ? mineralAbundance : 500, current: i === 0 ? mineralAbundance : 500, totalMined: 0 },
+        { type: "energy" as const,      phase: 3 as const, abundance: 300,  current: 300,  totalMined: 0 },
+      ],
+      facilityId: null,
+    }));
+    return {
+      id: "g1" as GameId,
+      player: { id: "p1" as PlayerId, funds, completedResearch },
+      plots,
+      facilities: new Map(),
+      sessionDurationMs: 360_000,
+      startedAt: NOW,
+      status: "playing",
+    };
+  }
+
+  it("前提研究が alternative-building である（alternativity-efficiency）", () => {
+    expect(ALTERNATIVITY_EFFICIENCY.prerequisites).toContain("alternative-building");
+  });
+
+  it("special フラグが true である（alternative-building）", () => {
+    expect(ALTERNATIVE_BUILDING.special).toBe(true);
+  });
+
+  it("research なしでは割引なし（通常コストが引かれる）", () => {
+    const game = makeGameWithMineral(1000);
+    const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    expect(g.player.funds).toBe(10_000 - AGRI_ENTRY.buildCost);
+  });
+
+  it("alternative-building Lv1 で mineral_abundance × 0.0002 の割引が適用される", () => {
+    // mineral abundance=1000 → 割引率 = 1000 × 0.0002 = 0.2 (20%)
+    const game = makeGameWithMineral(1000, 10_000, research(["alternative-building", 1]));
+    const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.2));
+    expect(g.player.funds).toBe(10_000 - expectedCost);
+  });
+
+  it("mineral abundance が低いほど割引率が小さい", () => {
+    // abundance=200 → 割引率 = 200 × 0.0002 = 0.04 (4%)
+    const game = makeGameWithMineral(200, 10_000, research(["alternative-building", 1]));
+    const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.04));
+    expect(g.player.funds).toBe(10_000 - expectedCost);
+  });
+
+  it("alternativity-efficiency Lv1 で割引率が 1.2 倍になる", () => {
+    // abundance=1000, effLv=1 → 割引率 = 1000 × 0.0002 × 1.2 = 0.24 (24%)
+    const game = makeGameWithMineral(1000, 10_000, research(["alternative-building", 1], ["alternativity-efficiency", 1]));
+    const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.24));
+    expect(g.player.funds).toBe(10_000 - expectedCost);
+  });
+
+  it("alternativity-efficiency Lv2 で割引率が 1.44 倍になる", () => {
+    // abundance=1000, effLv=2 → 割引率 = 1000 × 0.0002 × 1.44 = 0.288 (28.8%)
+    const game = makeGameWithMineral(1000, 10_000, research(["alternative-building", 1], ["alternativity-efficiency", 2]));
+    const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    const rate = 1000 * 0.0002 * Math.pow(1.2, 2);
+    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - rate));
+    expect(g.player.funds).toBe(10_000 - expectedCost);
+  });
+
+  it("割引率は最大1.0（コストが0未満にならない）", () => {
+    // abundance=5000 × 0.0002 = 1.0 → コスト0
+    const game = makeGameWithMineral(5000, 10_000, research(["alternative-building", 1]));
+    const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    expect(g.player.funds).toBe(10_000); // コスト0
+  });
+
+  it("alternativity-efficiency のコストは 1.5 倍ずつ増加する（Lv0: 200, Lv1: 300）", () => {
+    const cr = new Map<ResearchId, number>();
+    expect(getResearchCost(ALTERNATIVITY_EFFICIENCY, cr)).toBe(200);
+    cr.set(r("alternativity-efficiency"), 1);
+    expect(getResearchCost(ALTERNATIVITY_EFFICIENCY, cr)).toBe(300);
+  });
+});
+
 // ── computeScore ─────────────────────────────────────────────
 
 describe("computeScore", () => {
@@ -393,14 +708,13 @@ describe("computeScore", () => {
     expect(score.monumentBonus).toBe(0);
   });
 
-  it("採掘量（abundance - current の合計）がスコアに反映される", () => {
+  it("totalMined の合計がスコアに反映される", () => {
     let game = makeGame();
-    // plot[0] の農産を100単位採掘済みにする
     game = {
       ...game,
       plots: game.plots.map((p, i) =>
         i === 0
-          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 900 } : d)) }
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 900, totalMined: 100 } : d)) }
           : p,
       ),
     };
@@ -411,7 +725,7 @@ describe("computeScore", () => {
     expect(score.total).toBe(100);
   });
 
-  it("複数資源の採掘量が resourcesByType に分類される", () => {
+  it("複数資源の totalMined が resourcesByType に分類される", () => {
     let game = makeGame();
     game = {
       ...game,
@@ -420,8 +734,8 @@ describe("computeScore", () => {
           ? {
               ...p,
               deposits: p.deposits.map((d) => {
-                if (d.type === "agriculture") return { ...d, current: 800 }; // 200採掘
-                if (d.type === "mineral")     return { ...d, current: 400 }; // 100採掘
+                if (d.type === "agriculture") return { ...d, current: 800, totalMined: 200 };
+                if (d.type === "mineral")     return { ...d, current: 400, totalMined: 100 };
                 return d;
               }),
             }
@@ -434,6 +748,24 @@ describe("computeScore", () => {
     expect(score.resourcesByType.mineral).toBe(100);
     expect(score.resourcesByType.energy).toBe(0);
     expect(score.resourcesMined).toBe(300);
+  });
+
+  it("再生後に再採掘した分も totalMined に加算されスコアに反映される", () => {
+    // abundance=100 の資源を全採掘 → 再生で50回復 → さらに50採掘
+    // totalMined=150, current=50 になるケース
+    let game = makeGame();
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, abundance: 100, current: 50, totalMined: 150 } : d)) }
+          : p,
+      ),
+    };
+    const score = computeScore(game);
+
+    // abundance - current = 50 だが totalMined = 150 が正確な採掘量
+    expect(score.resourcesByType.agriculture).toBe(150);
   });
 
   it("研究消費額がスコアに加算される（agri-efficiency Lv2: 100 + 150 = 250）", () => {
@@ -472,7 +804,7 @@ describe("computeScore", () => {
       ...game,
       plots: game.plots.map((p, i) =>
         i === 0
-          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 949.3 } : d)) }
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 949.3, totalMined: 50.7 } : d)) }
           : p,
       ),
     };

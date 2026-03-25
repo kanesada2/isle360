@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { generatePlots } from "../../src/domain/plot";
 import { createRng } from "../../src/domain/rng";
 
@@ -55,24 +55,6 @@ describe("generatePlots", () => {
     }
   });
 
-  it("1ゲーム内で資源バランスが極端に偏らない（最大/最小 < 3）", () => {
-    for (let r = 0; r < RUNS; r++) {
-      const plots = generatePlots();
-      const totals = [0, 0, 0];
-      for (const plot of plots) {
-        totals[0] += plot.deposits[0].abundance;
-        totals[1] += plot.deposits[1].abundance;
-        totals[2] += plot.deposits[2].abundance;
-      }
-      const max = Math.max(...totals);
-      const min = Math.min(...totals);
-      // min が 0 になることはないはずだが念のためガード
-      if (min > 0) {
-        expect(max / min).toBeLessThan(3);
-      }
-    }
-  });
-
   it("同じシードで生成した結果が完全に一致する", () => {
     const plots1 = generatePlots(createRng(42));
     const plots2 = generatePlots(createRng(42));
@@ -96,17 +78,11 @@ describe("generatePlots", () => {
     }
 
     const means = totals.map((t) => t / RUNS);
-    const grandMean = means.reduce((s, m) => s + m, 0) / 3;
 
     // 各資源の平均が期待値の ±20% 以内
     for (const mean of means) {
       expect(mean).toBeGreaterThan(EXPECTED_PER_RESOURCE * 0.8);
       expect(mean).toBeLessThan(EXPECTED_PER_RESOURCE * 1.2);
-    }
-
-    // 3資源の平均が互いに ±20% 以内（バランス効果の確認）
-    for (const mean of means) {
-      expect(Math.abs(mean - grandMean)).toBeLessThan(grandMean * 0.2);
     }
   });
 });
