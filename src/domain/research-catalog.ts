@@ -89,11 +89,11 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("sustainable-farming"),
     name: "再生栽培",
     description:
-      "農産資源が自然再生するようになる。研究完了に60秒かかる。",
+      "農産資源が自然再生するようになる。研究完了に75秒かかる。",
     baseCost: 500,
     repeatable: false,
     prerequisites: [],
-    researchDurationMs: 60_000,
+    researchDurationMs: 75_000,
     special: true,
   },
   {
@@ -109,11 +109,11 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("alternative-building"),
     name: "鉱物活用建築",
     description:
-      "そのマスに埋蔵された鉱物資源の量に応じて建築に必要な資金が減少する。研究完了に60秒かかる。",
+      "そのマスに埋蔵された鉱物資源の量に応じて建築に必要な資金が減少する。研究完了に75秒かかる。",
     baseCost: 500,
     repeatable: false,
     prerequisites: [],
-    researchDurationMs: 60_000,
+    researchDurationMs: 75_000,
     special: true,
   },
   {

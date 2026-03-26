@@ -67,7 +67,13 @@ export function startResearch(
   const newActiveResearchIds = new Set(game.player.activeResearchIds);
   newActiveResearchIds.add(entry.key as ResearchId);
 
-  return { ...game, player: { ...newPlayer, activeResearchIds: newActiveResearchIds }, facilities: newFacilities };
+  const stateAfter = { ...game, player: { ...newPlayer, activeResearchIds: newActiveResearchIds }, facilities: newFacilities };
+  const logEntry = makeLogEntry(stateAfter, now, {
+    kind: 'research-start',
+    researchKey: entry.key as string,
+    plotIndex: (facility as Laboratory).plotIndex,
+  });
+  return { ...stateAfter, logs: [...game.logs, logEntry] };
 }
 
 /** 採掘の基本設定 */
@@ -148,7 +154,7 @@ function calcRefineryMultiplier(
 function makeLogEntry(
   game: Game,
   now: number,
-  fields: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'researchKey'>,
+  fields: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'facilityKey' | 'researchKey' | 'plotIndex'>,
 ): GameLogEntry {
   return {
     ...fields,
@@ -160,7 +166,15 @@ function makeLogEntry(
 
 /** ゲームを開始する（status: playing、startedAt を設定） */
 export function startGame(game: Game, now: number): Game {
-  return { ...game, status: 'playing', startedAt: now };
+  const started = { ...game, status: 'playing' as const, startedAt: now };
+  const logEntry: GameLogEntry = {
+    kind: 'game-start',
+    elapsedMs: 0,
+    score: 0,
+    fundsPerSecond: 0,
+    mapSeed: game.mapSeed,
+  };
+  return { ...started, logs: [logEntry] };
 }
 
 /** 指定 plot に施設を建設開始する（state: constructing） */
@@ -215,7 +229,14 @@ export function buildFacility(
     funds: game.player.funds - actualCost,
   };
 
-  return { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
+  const stateAfter = { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
+  const logEntry = makeLogEntry(stateAfter, now, {
+    kind: 'construction-start',
+    facilityKind: facility.kind,
+    facilityKey: entry.key as string,
+    plotIndex,
+  });
+  return { ...stateAfter, logs: [...game.logs, logEntry] };
 }
 
 /** 指定 plot の施設を破壊開始する（state: demolishing） */
@@ -245,6 +266,7 @@ export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number):
   const logEntry = makeLogEntry(stateAfter, now, {
     kind: 'demolish-start',
     facilityKind: facility.kind,
+    plotIndex,
   });
 
   return { ...stateAfter, logs: [...game.logs, logEntry] };
@@ -535,4 +557,33 @@ export function computeScore(game: Game): ScoreBreakdown {
     monumentBonus,
     monumentCount,
   };
+}
+
+/**
+ * リプレイ用: ログエントリに記録されたアクションをゲーム状態に適用する。
+ * construction-complete / research-complete / game-start は tickFacilities が処理するため無視。
+ */
+export function applyReplayEvent(game: Game, event: GameLogEntry, now: number): Game {
+  if (event.plotIndex === undefined) return game;
+
+  switch (event.kind) {
+    case 'construction-start': {
+      if (!event.facilityKey) return game;
+      const entry = FACILITY_CATALOG.find((e) => e.key === event.facilityKey);
+      if (!entry) return game;
+      return buildFacility(game, event.plotIndex, entry, now);
+    }
+    case 'demolish-start':
+      return demolishFacility(game, event.plotIndex, now);
+    case 'research-start': {
+      if (!event.researchKey) return game;
+      const facilityId = game.plots[event.plotIndex].facilityId;
+      if (!facilityId) return game;
+      const entry = RESEARCH_CATALOG.find((e) => e.key === event.researchKey);
+      if (!entry) return game;
+      return startResearch(game, facilityId, entry, now);
+    }
+    default:
+      return game;
+  }
 }

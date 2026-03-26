@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Pressable,
@@ -8,10 +8,12 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import Svg, { Line, Polyline, Circle, Text as SvgText } from 'react-native-svg';
 
 import { Colors, Spacing } from '@/constants/theme';
 import type { ScoreBreakdown } from '@/domain/facility-actions';
+import { encodeLogs } from '@/domain/log-codec';
 import type { GameLogEntry } from '@/domain/types';
 
 type Tab = 'score' | 'graph';
@@ -179,10 +181,20 @@ type AppColors = typeof Colors.light | typeof Colors.dark;
 
 type ScoreTabProps = {
   breakdown: ScoreBreakdown;
+  logs: GameLogEntry[];
   colors: AppColors;
 };
 
-function ScoreTab({ breakdown, colors }: ScoreTabProps) {
+function ScoreTab({ breakdown, logs, colors }: ScoreTabProps) {
+  const token = useMemo(() => encodeLogs(logs), [logs]);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    Clipboard.setStringAsync(token);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <>
       <View style={[styles.scoreBox, { backgroundColor: colors.background }]}>
@@ -191,6 +203,18 @@ function ScoreTab({ breakdown, colors }: ScoreTabProps) {
           {breakdown.total.toLocaleString()} pt
         </Text>
       </View>
+
+      <Pressable
+        style={[styles.tokenBox, { backgroundColor: colors.background, borderColor: colors.backgroundSelected }]}
+        onPress={handleCopy}
+      >
+        <Text style={[styles.tokenLabel, { color: colors.textSecondary }]}>
+          {copied ? 'コピーしました' : 'ログトークン（タップでコピー）'}
+        </Text>
+        <Text style={[styles.tokenText, { color: colors.text }]} numberOfLines={2}>
+          {token}
+        </Text>
+      </Pressable>
 
       <ScrollView
         style={styles.scroll}
@@ -326,7 +350,7 @@ export function ResultModal({ visible, breakdown, onRestart, onClose, logs }: Pr
 
           {/* タブコンテンツ */}
           {activeTab === 'score'
-            ? <ScoreTab breakdown={breakdown} colors={colors} />
+            ? <ScoreTab breakdown={breakdown} logs={logs} colors={colors} />
             : <GraphTab logs={logs} colors={colors} />
           }
 
@@ -338,7 +362,7 @@ export function ResultModal({ visible, breakdown, onRestart, onClose, logs }: Pr
             onPress={onRestart}
           >
             <Text style={[styles.restartButtonText, { color: colors.background }]}>
-              もう一度プレイ
+              トップへ
             </Text>
           </Pressable>
 
@@ -423,6 +447,19 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
+  },
+  tokenBox: {
+    borderRadius: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.two,
+    gap: Spacing.one,
+  },
+  tokenLabel: {
+    fontSize: 11,
+  },
+  tokenText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
   },
   scroll: {
     flexGrow: 0,

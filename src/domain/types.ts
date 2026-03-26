@@ -84,8 +84,11 @@ export type Player = {
 
 // ── GameLog ───────────────────────────────────────────────────
 export type GameEventKind =
+  | "game-start"
+  | "construction-start"
   | "construction-complete"
   | "demolish-start"
+  | "research-start"
   | "research-complete";
 
 export type GameLogEntry = {
@@ -93,8 +96,11 @@ export type GameLogEntry = {
   elapsedMs:       number;   // ゲーム開始からの経過時間（ms）
   score:           number;   // その時点の総スコア
   fundsPerSecond:  number;   // その時点の資金/秒
-  facilityKind?:   Facility["kind"];  // 建設完了・破壊開始時
-  researchKey?:    string;            // 研究完了時
+  facilityKind?:   Facility["kind"];  // 建設開始・完了・破壊開始時
+  facilityKey?:    string;            // 建設開始時のカタログキー（リプレイ用）
+  researchKey?:    string;            // 研究開始・完了時
+  plotIndex?:      PlotIndex;         // 建設・破壊・研究開始時のプロット（リプレイ用）
+  mapSeed?:        number;            // game-start エントリのみ
 };
 
 // ── Game（セッション全体）────────────────────────────────────────
@@ -105,6 +111,7 @@ export type Game = {
   player:            Player;
   plots:             readonly Plot[];
   facilities:        Map<FacilityId, Facility>;
+  mapSeed:           number;
   sessionDurationMs: number;
   startedAt:         number | null;
   status:            GameStatus;

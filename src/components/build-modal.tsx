@@ -11,9 +11,10 @@ type Props = {
   funds: number;
   monumentUnderConstruction: boolean;
   discountRate: number;
+  actionDisabled?: boolean;
 };
 
-export function BuildModal({ visible, onClose, onBuild, availableFacilityKeys, funds, monumentUnderConstruction, discountRate }: Props) {
+export function BuildModal({ visible, onClose, onBuild, availableFacilityKeys, funds, monumentUnderConstruction, discountRate, actionDisabled = false }: Props) {
   const firstAvailableKey =
     FACILITY_CATALOG.find((e) => availableFacilityKeys.has(e.key))?.key ?? FACILITY_CATALOG[0].key;
   const [selectedKey, setSelectedKey] = useState<string>(firstAvailableKey);
@@ -41,6 +42,7 @@ export function BuildModal({ visible, onClose, onBuild, availableFacilityKeys, f
       descriptionTitle={selected.name}
       descriptionText={selected.description}
       actionLabel={`建設する（${actualCost(selected.buildCost).toLocaleString()} G）`}
+      actionForceDisabled={actionDisabled}
       onAction={() => {
         onBuild(selected);
         onClose();

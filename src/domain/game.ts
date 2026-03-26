@@ -1,13 +1,15 @@
 import type { Game, Player } from "./types";
 import { newGameId, newPlayerId } from "./id";
 import { generatePlots } from "./plot";
+import { createRng } from "./rng";
 
 type CreateGameParams = {
   sessionDurationMs: number;
   initialFunds: number;
+  mapSeed?: number;
 };
 
-export function createGame({ sessionDurationMs, initialFunds }: CreateGameParams): Game {
+export function createGame({ sessionDurationMs, initialFunds, mapSeed: seedParam }: CreateGameParams): Game {
   const player: Player = {
     id: newPlayerId(),
     funds: initialFunds,
@@ -15,11 +17,14 @@ export function createGame({ sessionDurationMs, initialFunds }: CreateGameParams
     activeResearchIds: new Set(),
   };
 
+  const mapSeed = seedParam ?? Math.floor(Math.random() * 0xFFFFFFFF);
+
   return {
     id: newGameId(),
     player,
-    plots: generatePlots(),
+    plots: generatePlots(createRng(mapSeed)),
     facilities: new Map(),
+    mapSeed,
     sessionDurationMs,
     startedAt: null,
     status: "setup",
