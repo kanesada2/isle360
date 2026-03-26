@@ -64,7 +64,10 @@ export function startResearch(
     funds: Math.round((game.player.funds - cost) * 100) / 100,
   };
 
-  return { ...game, player: newPlayer, facilities: newFacilities };
+  const newActiveResearchIds = new Set(game.player.activeResearchIds);
+  newActiveResearchIds.add(entry.key as ResearchId);
+
+  return { ...game, player: { ...newPlayer, activeResearchIds: newActiveResearchIds }, facilities: newFacilities };
 }
 
 /** 採掘の基本設定 */
@@ -102,7 +105,7 @@ function getConstructionMultiplier(completedResearch: Map<ResearchId, number>): 
  * 鉱物活用建築による建設コスト割引率を返す（0〜1）。
  * 割引率 = mineral_abundance × 0.0002 × 1.2^(alternativity-efficiency レベル)、上限1.0。
  */
-function getMineralBuildDiscountRate(
+export function getMineralBuildDiscountRate(
   plotIndex: PlotIndex,
   plots: Game['plots'],
   completedResearch: Map<ResearchId, number>,
@@ -229,9 +232,14 @@ export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number):
     state: 'demolishing' as const,
     currentJob: { startedAt: now, durationMs: Math.round(DEMOLISH_DURATION_MS * getConstructionMultiplier(game.player.completedResearch)) },
   });
+  const newActiveResearchIds = new Set(game.player.activeResearchIds);
+  if (facility.kind === 'laboratory' && facility.activeResearchId) {
+    newActiveResearchIds.delete(facility.activeResearchId);
+  }
   const newPlayer = {
     ...game.player,
     funds: game.player.funds - facility.demolishCost,
+    activeResearchIds: newActiveResearchIds,
   };
   const stateAfter = { ...game, player: newPlayer, facilities: newFacilities };
   const logEntry = makeLogEntry(stateAfter, now, {
@@ -253,6 +261,7 @@ export function tickFacilities(game: Game, now: number): Game {
   const newFacilities = new Map(game.facilities);
   let newPlots: readonly Plot[] = game.plots;
   let newPlayer = game.player;
+  const newActiveResearchIds = new Set(game.player.activeResearchIds);
   const pendingEvents: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'researchKey'>[] = [];
 
   for (const [id, facility] of game.facilities) {
@@ -278,6 +287,7 @@ export function tickFacilities(game: Game, now: number): Game {
             newCompletedResearch.set(lab.activeResearchId, currentLevel + 1);
             newPlayer = { ...newPlayer, completedResearch: newCompletedResearch };
             pendingEvents.push({ kind: 'research-complete', researchKey: lab.activeResearchId as string });
+            newActiveResearchIds.delete(lab.activeResearchId);
           }
           newFacilities.set(id, {
             ...lab,
@@ -374,7 +384,7 @@ export function tickFacilities(game: Game, now: number): Game {
       const deltaSec = (now - deposit.lastRegenAt) / 1000;
       const regenLevel = newPlayer.completedResearch.get(REGEN_EFFICIENCY_KEY) ?? 0;
       const regenMultiplier = Math.pow(1.2, regenLevel);
-      const regenAmount = deposit.abundance * 0.005 * regenMultiplier * deltaSec;
+      const regenAmount = deposit.abundance * 0.004 * regenMultiplier * deltaSec;
       const newCurrent = Math.min(deposit.abundance, deposit.current + regenAmount);
       changed = true;
       return {
@@ -388,7 +398,7 @@ export function tickFacilities(game: Game, now: number): Game {
 
   if (!changed) return game;
 
-  const nextGame = { ...game, player: newPlayer, facilities: newFacilities, plots: newPlots };
+  const nextGame = { ...game, player: { ...newPlayer, activeResearchIds: newActiveResearchIds }, facilities: newFacilities, plots: newPlots };
   if (pendingEvents.length === 0) return nextGame;
 
   const newLogs = pendingEvents.map((ev) => makeLogEntry(nextGame, now, ev));

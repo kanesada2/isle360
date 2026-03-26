@@ -40,7 +40,7 @@ function makeGame(
   }));
   return {
     id: "g1" as GameId,
-    player: { id: "p1" as PlayerId, funds, completedResearch },
+    player: { id: "p1" as PlayerId, funds, completedResearch, activeResearchIds: new Set() },
     plots,
     facilities: new Map(),
     sessionDurationMs: 360_000,
@@ -628,7 +628,7 @@ describe("鉱物活用建築", () => {
     }));
     return {
       id: "g1" as GameId,
-      player: { id: "p1" as PlayerId, funds, completedResearch },
+      player: { id: "p1" as PlayerId, funds, completedResearch, activeResearchIds: new Set() },
       plots,
       facilities: new Map(),
       sessionDurationMs: 360_000,

@@ -14,10 +14,10 @@ type Props = {
   onDemolish?: () => void;
   demolishDisabled?: boolean;
   labProcessing?: boolean;
-  activeResearchId?: ResearchId | null;
+  activeResearchProgress?: Map<ResearchId, number>;
 };
 
-export function ResearchModal({ visible, onClose, onResearch, completedResearch, funds, onDemolish, demolishDisabled, labProcessing, activeResearchId }: Props) {
+export function ResearchModal({ visible, onClose, onResearch, completedResearch, funds, onDemolish, demolishDisabled, labProcessing, activeResearchProgress }: Props) {
   const [selectedKey, setSelectedKey] = useState<string>(RESEARCH_CATALOG[0].key);
   const selected = RESEARCH_CATALOG.find((e) => e.key === selectedKey) ?? RESEARCH_CATALOG[0];
 
@@ -28,16 +28,21 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
       (prereq) => (completedResearch.get(prereq as ResearchId) ?? 0) >= 1,
     );
     const cost = getResearchCost(e, completedResearch);
-    const inProgress = activeResearchId === e.key ? 1 : 0;
-    const nextLevel = (completedResearch.get(e.key as ResearchId) ?? 0) + 1 + inProgress;
+    const progress = activeResearchProgress?.get(e.key as ResearchId);
+    const isActive = progress !== undefined;
+    const nextLevel = (completedResearch.get(e.key as ResearchId) ?? 0) + 1;
     return {
       key: e.key,
       name: e.repeatable ? `${e.name} Lv.${nextLevel}` : e.name,
       costLabel: e.repeatable ? `${cost.toLocaleString()} G〜` : `${cost.toLocaleString()} G`,
-      disabled: !prerequisitesMet || cost > funds,
+      disabled: !prerequisitesMet || cost > funds || isActive,
       special: e.special ?? false,
+      progress,
     };
   });
+
+  const selectedProgress = activeResearchProgress?.get(selected.key as ResearchId);
+  const selectedIsActive = selectedProgress !== undefined;
 
   return (
     <CatalogModal
@@ -55,7 +60,7 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
       }}
       onDemolish={onDemolish}
       demolishDisabled={demolishDisabled}
-      actionForceDisabled={labProcessing}
+      actionForceDisabled={labProcessing || selectedIsActive}
     />
   );
 }

@@ -79,6 +79,7 @@ export type Player = {
   id:                PlayerId;
   funds:             number;
   completedResearch: Map<ResearchId, number>;  // researchId → 到達レベル
+  activeResearchIds: Set<ResearchId>;          // 現在処理中の研究キー
 };
 
 // ── GameLog ───────────────────────────────────────────────────

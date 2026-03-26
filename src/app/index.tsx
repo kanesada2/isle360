@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { InteractionManager, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ import {
   demolishFacility,
   getFacilityDetailRows,
   getFacilityDisplayName,
+  getMineralBuildDiscountRate,
   startGame,
   startResearch,
   tickFacilities,
@@ -27,7 +28,7 @@ import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
 import { createGame } from '@/domain/game';
 import type { ResearchCatalogEntry } from '@/domain/research-catalog';
 import { getAvailableFacilityKeys, getUnlockedPhases } from '@/domain/research-unlock';
-import type { Game, PlotIndex, ResourcePhase } from '@/domain/types';
+import type { Game, PlotIndex, ResearchId, ResourcePhase } from '@/domain/types';
 import { useGameLoop } from '@/hooks/use-game-loop';
 
 const SESSION_DURATION_MS = 360_000;
@@ -94,6 +95,17 @@ export default function GameScreen() {
     () => getAvailableFacilityKeys(game.player.completedResearch),
     [game.player.completedResearch],
   );
+
+  const activeResearchProgress = useMemo(() => {
+    const map = new Map<ResearchId, number>();
+    for (const f of game.facilities.values()) {
+      if (f.kind === 'laboratory' && f.state === 'processing' && f.activeResearchId && f.currentJob) {
+        const progress = Math.min(1, (now - f.currentJob.startedAt) / f.currentJob.durationMs);
+        map.set(f.activeResearchId, Math.max(map.get(f.activeResearchId) ?? 0, progress));
+      }
+    }
+    return map;
+  }, [game.facilities, now]);
 
   const { phaseTotals, phaseCurrents, phaseUnlocked } = useMemo(() => {
     const totals: Record<ResourcePhase, number> = { 1: 0, 2: 0, 3: 0 };
@@ -178,26 +190,23 @@ export default function GameScreen() {
 
   const handleFacilityTap = useCallback(() => {
     if (gameFinished) {
-      InteractionManager.runAfterInteractions().then(() =>setResultVisible(true));
+      setTimeout(() => setResultVisible(true), 0);
       return;
     }
     if (!gameStarted) return;
-    // InteractionManager.runAfterInteractions でモーダル開放を全インタラクション完了後に遅延し、
-    // 現在のタッチイベント処理が完全に終わってからモーダルを開く。
-    // これにより「開いた瞬間にモーダルが閉じる」「ボタンが即確定される」を防ぐ。
     if (!currentFacility) {
-      InteractionManager.runAfterInteractions().then(() =>setBuildModalVisible(true));
+      setTimeout(() => setBuildModalVisible(true), 0);
       return;
     }
     if (currentFacility.kind === 'laboratory') {
       if (currentFacility.state === 'idle' || currentFacility.state === 'processing') {
-        InteractionManager.runAfterInteractions().then(() => setLabModalVisible(true));
+        setTimeout(() => setLabModalVisible(true), 0);
       }
     } else if (
       currentFacility.state === 'idle' &&
       (currentFacility.kind === 'extractor' || currentFacility.kind === 'refinery')
     ) {
-      InteractionManager.runAfterInteractions().then(() =>setFacilityDetailVisible(true));
+      setTimeout(() => setFacilityDetailVisible(true), 0);
     }
   }, [gameFinished, gameStarted, currentFacility]);
 
@@ -330,6 +339,7 @@ export default function GameScreen() {
         monumentUnderConstruction={[...game.facilities.values()].some(
           (f) => f.kind === 'monument' && f.state === 'constructing',
         )}
+        discountRate={getMineralBuildDiscountRate(selectedPlotIndex, game.plots, game.player.completedResearch)}
       />
       {/* 施設詳細モーダル（Extractor / Refinery） */}
       <FacilityDetailModal
@@ -358,7 +368,7 @@ export default function GameScreen() {
           handleDemolish();
         }}
         labProcessing={currentFacility?.state === 'processing'}
-        activeResearchId={currentFacility?.kind === 'laboratory' ? currentFacility.activeResearchId : null}
+        activeResearchProgress={activeResearchProgress}
       />
       {/* ゲームスタートオーバーレイ（スワイプは背後のGestureDetectorへ通過） */}
       {!gameStarted && <StartOverlay onStart={handleStart} />}
@@ -368,6 +378,7 @@ export default function GameScreen() {
         breakdown={scoreBreakdown}
         onRestart={handleRestart}
         onClose={() => setResultVisible(false)}
+        logs={game.logs}
       />
     </SafeAreaView>
   );

@@ -20,6 +20,8 @@ export type CatalogModalItem = {
   disabled?: boolean;
   /** true の場合、特別な研究として金色ボーダーで強調表示する */
   special?: boolean;
+  /** 0〜1 の進捗値。指定時はアイテム背景にプログレスバーを描画する */
+  progress?: number;
 };
 
 type Props = {
@@ -95,6 +97,20 @@ export function CatalogModal({
                   ]}
                   onPress={() => onSelectKey(item.key)}
                 >
+                  {item.progress !== undefined && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: `${item.progress * 100}%`,
+                        backgroundColor: special ? '#C9A227' : colors.text,
+                        opacity: 0.15,
+                        borderRadius: Spacing.two,
+                      }}
+                    />
+                  )}
                   <View style={styles.listItemLeft}>
                     {special && (
                       <Text style={styles.specialBadge}>✦</Text>
@@ -211,6 +227,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderRadius: Spacing.two,
     borderWidth: 1,
+    overflow: 'hidden',
   },
   listItemSpecial: {
     borderWidth: 2,
