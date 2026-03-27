@@ -69,7 +69,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
   },
   {
     key: r("refinery-efficiency"),
-    name: "精製技術向上",
+    name: "精製効率向上",
     description:
       "精製工場によって高まる付加価値が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加する。",
     baseCost: 200,
@@ -78,7 +78,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
   },
   {
     key: r("construction-efficiency"),
-    name: "建築技術向上",
+    name: "建築速度向上",
     description:
       "施設の建造・破壊にかかる時間が 10% 短縮される。繰り返し研究可能だがコストは毎回 50% 増加する。",
     baseCost: 300,
@@ -101,7 +101,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     name: "再生効率向上",
     description:
       "農産資源の再生速度が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加する。再生栽培の研究完了が前提。",
-    baseCost: 200,
+    baseCost: 300,
     repeatable: true,
     prerequisites: [r("sustainable-farming")],
   },
@@ -120,8 +120,8 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("alternativity-efficiency"),
     name: "鉱物活用率向上",
     description:
-      "建築に必要な資源の減少率が20%向上する。繰り返し研究可能だがコストは毎回 50% 増加する。鉱物活用建築の研究完了が前提。",
-    baseCost: 200,
+      "建築に必要な資源の減少率が30%向上する。繰り返し研究可能だがコストは毎回 50% 増加する。鉱物活用建築の研究完了が前提。",
+    baseCost: 300,
     repeatable: true,
     prerequisites: [r("alternative-building")],
   },

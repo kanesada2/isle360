@@ -506,10 +506,12 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
         onClose={() => setBuildModalVisible(false)}
         onBuild={isReplay ? () => {} : handleBuild}
         availableFacilityKeys={availableFacilityKeys}
+        blockedFacilityKeys={
+          [...game.facilities.values()].some(f => f.kind === 'monument' && f.state === 'constructing')
+            ? new Set(['monument'])
+            : undefined
+        }
         funds={game.player.funds}
-        monumentUnderConstruction={[...game.facilities.values()].some(
-          (f) => f.kind === 'monument' && f.state === 'constructing',
-        )}
         discountRate={getMineralBuildDiscountRate(selectedPlotIndex, game.plots, game.player.completedResearch)}
         actionDisabled={isReplay}
       />

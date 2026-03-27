@@ -120,7 +120,7 @@ export function getMineralBuildDiscountRate(
   const mineralDeposit = plots[plotIndex].deposits.find((d) => d.type === 'mineral');
   if (!mineralDeposit) return 0;
   const effLevel = completedResearch.get(ALTERNATIVITY_EFFICIENCY_KEY) ?? 0;
-  return Math.min(1, mineralDeposit.abundance * 0.0002 * Math.pow(1.2, effLevel));
+  return Math.min(1, mineralDeposit.abundance * 0.0002 * Math.pow(1.3, effLevel));
 }
 
 function getRefineryResearchMultiplier(completedResearch: Map<ResearchId, number>): number {
@@ -184,6 +184,14 @@ export function buildFacility(
   entry: FacilityCatalogEntry,
   now: number,
 ): Game {
+  // Monument は同時に1基しか建設できない
+  if (entry.kind === 'monument') {
+    const alreadyBuilding = [...game.facilities.values()].some(
+      f => f.kind === 'monument' && f.state === 'constructing',
+    );
+    if (alreadyBuilding) return game;
+  }
+
   const facilityId = newFacilityId();
   const base = {
     id: facilityId,
