@@ -154,7 +154,7 @@ function calcRefineryMultiplier(
 function makeLogEntry(
   game: Game,
   now: number,
-  fields: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'facilityKey' | 'researchKey' | 'plotIndex'>,
+  fields: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'facilityKey' | 'researchKey' | 'plotIndex' | 'resourceType'>,
 ): GameLogEntry {
   return {
     ...fields,
@@ -284,7 +284,7 @@ export function tickFacilities(game: Game, now: number): Game {
   let newPlots: readonly Plot[] = game.plots;
   let newPlayer = game.player;
   const newActiveResearchIds = new Set(game.player.activeResearchIds);
-  const pendingEvents: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'researchKey'>[] = [];
+  const pendingEvents: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'researchKey' | 'resourceType'>[] = [];
 
   for (const [id, facility] of game.facilities) {
     // ── 建設・破壊ジョブの完了チェック ──────────────────────────
@@ -324,6 +324,11 @@ export function tickFacilities(game: Game, now: number): Game {
           newPlots = newPlots.map((p, i) =>
             i === facility.plotIndex ? { ...p, facilityId: null } : p,
           );
+          pendingEvents.push({
+            kind: 'demolish-complete',
+            facilityKind: facility.kind,
+            resourceType: facility.kind === 'extractor' ? (facility as Extractor).resourceType : undefined,
+          });
           changed = true;
           continue;
         }
@@ -333,7 +338,12 @@ export function tickFacilities(game: Game, now: number): Game {
     // ── Extractor 採掘処理 ────────────────────────────────────────
     if (facility.state !== 'idle' || facility.kind !== 'extractor') continue;
     const extractor = facility as Extractor;
-    if (extractor.lastCycleAt === null) continue;
+    if (extractor.lastCycleAt === null) {
+      // チュートリアルの事前建設 Extractor など: 初回 tick でサイクルを開始する
+      newFacilities.set(id, { ...extractor, lastCycleAt: now });
+      changed = true;
+      continue;
+    }
 
     const cyclesElapsed = Math.floor((now - extractor.lastCycleAt) / extractor.cycleDurationMs);
     if (cyclesElapsed <= 0) continue;

@@ -3,23 +3,33 @@ import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native'
 
 import { Colors, Spacing } from '@/constants/theme';
 
+const DEFAULT_TITLE = 'Isle 360';
+const DEFAULT_BODY =
+  '360秒間で9マスのマップを開拓し尽くせ！\n' +
+  '資源の埋蔵量を確認しながら採集施設を建造し、どんどん資金を稼ごう。\n' +
+  'スコアを稼ぐためには研究所での研究がカギ。\n' +
+  'スワイプしてマップを確認し、準備ができたらスタートしてください。';
+const DEFAULT_BUTTON_LABEL = 'スタート';
+
 type Props = {
   onStart: () => void;
+  title?: string;
+  body?: string;
+  buttonLabel?: string;
 };
 
-export function StartOverlay({ onStart }: Props) {
+export function StartOverlay({ onStart, title, body, buttonLabel }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   return (
     <View style={styles.overlay} pointerEvents="box-none">
       <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Isle 360</Text>
+        <Text style={[styles.title, { color: colors.text }]}>
+          {title ?? DEFAULT_TITLE}
+        </Text>
         <Text style={[styles.description, { color: colors.textSecondary }]}>
-          360秒間で9マスのマップを開拓し尽くせ！{'\n'}
-          資源の埋蔵量を確認しながら採集施設を建造し、どんどん資金を稼ごう。{'\n'}
-          スコアを稼ぐためには研究所での研究がカギ。{'\n'}
-          スワイプしてマップを確認し、準備ができたらスタートしてください。
+          {body ?? DEFAULT_BODY}
         </Text>
         <Pressable
           style={({ pressed }) => [
@@ -28,7 +38,9 @@ export function StartOverlay({ onStart }: Props) {
           ]}
           onPress={onStart}
         >
-          <Text style={[styles.buttonText, { color: colors.background }]}>スタート</Text>
+          <Text style={[styles.buttonText, { color: colors.background }]}>
+            {buttonLabel ?? DEFAULT_BUTTON_LABEL}
+          </Text>
         </Pressable>
       </View>
     </View>

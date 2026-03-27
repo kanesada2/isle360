@@ -88,6 +88,7 @@ export type GameEventKind =
   | "construction-start"
   | "construction-complete"
   | "demolish-start"
+  | "demolish-complete"
   | "research-start"
   | "research-complete";
 
@@ -98,6 +99,7 @@ export type GameLogEntry = {
   fundsPerSecond:  number;   // その時点の資金/秒
   facilityKind?:   Facility["kind"];  // 建設開始・完了・破壊開始時
   facilityKey?:    string;            // 建設開始時のカタログキー（リプレイ用）
+  resourceType?:   ResourceType;      // extractor の demolish-complete 時
   researchKey?:    string;            // 研究開始・完了時
   plotIndex?:      PlotIndex;         // 建設・破壊・研究開始時のプロット（リプレイ用）
   mapSeed?:        number;            // game-start エントリのみ

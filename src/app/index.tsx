@@ -61,6 +61,19 @@ export default function TopScreen() {
                 backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
               },
             ]}
+            onPress={() => router.push('/tutorial')}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Tutorial</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                borderColor: colors.text,
+                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
+              },
+            ]}
             onPress={() => setReplayModalVisible(true)}
           >
             <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Replay</Text>

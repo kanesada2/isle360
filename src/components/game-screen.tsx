@@ -8,11 +8,19 @@ import { runOnJS } from 'react-native-worklets';
 
 import { BuildModal } from '@/components/build-modal';
 import { FacilityDetailModal } from '@/components/facility-detail-modal';
+import { MissionBar } from '@/components/mission-bar';
+import { MissionCompleteModal } from '@/components/mission-complete-modal';
 import { PhaseResourceBar } from '@/components/phase-resource-bar';
 import { ResearchModal } from '@/components/research-modal';
 import { ResultModal } from '@/components/result-modal';
 import { StartOverlay } from '@/components/start-overlay';
 import { TimerBar } from '@/components/timer-bar';
+import { TutorialCompleteModal } from '@/components/tutorial-complete-modal';
+import { TutorialHintModal } from '@/components/tutorial-hint-modal';
+import { createTutorialGame } from '@/domain/tutorial';
+import type { TutorialStage } from '@/domain/tutorial';
+import { useMissions } from '@/hooks/use-missions';
+import { usePlotTriggers } from '@/hooks/use-plot-triggers';
 import { Colors, Spacing } from '@/constants/theme';
 import {
   applyReplayEvent,
@@ -43,10 +51,15 @@ const SUBTICK_MS = 16;
 type Props = {
   /** リプレイモード用のログ。指定するとリプレイ画面として動作する */
   replayLogs?: GameLogEntry[];
+  /** チュートリアルステージ設定。指定するとチュートリアルモードで動作する */
+  tutorialStage?: TutorialStage;
+  /** チュートリアル完了時のコールバック。省略時はトップ画面に戻る */
+  onTutorialComplete?: () => void;
 };
 
-export function GameScreen({ replayLogs }: Props) {
+export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Props) {
   const isReplay = !!replayLogs;
+  const isTutorial = !!tutorialStage;
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
@@ -58,7 +71,9 @@ export function GameScreen({ replayLogs }: Props) {
   }, [replayLogs]);
 
   const [game, setGame] = useState<Game>(() =>
-    createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS, mapSeed }),
+    isTutorial
+      ? createTutorialGame(tutorialStage!)
+      : createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS, mapSeed }),
   );
 
   const gameStarted = game.status !== 'setup';
@@ -137,15 +152,34 @@ export function GameScreen({ replayLogs }: Props) {
     }
   }, [remaining, gameStarted, gameFinished]);
 
+  // ── ミッション追跡（チュートリアルのみ）────────────────────────
+  const { statuses: missionStatuses, currentMission, dismissCurrent, allDone: missionAllDone } =
+    useMissions(tutorialStage, game, gameStarted);
+
+  // 全ミッション達成でゲームを終了させる
+  useEffect(() => {
+    if (!isTutorial || !missionAllDone || gameFinished || !gameStarted) return;
+    setGame(g => ({ ...g, status: 'finished' }));
+  }, [isTutorial, missionAllDone, gameFinished, gameStarted]);
+
   const [resultVisible, setResultVisible] = useState(false);
+  const [tutorialCompleteVisible, setTutorialCompleteVisible] = useState(false);
 
   useEffect(() => {
     if (!gameFinished) return;
     setBuildModalVisible(false);
     setFacilityDetailVisible(false);
     setLabModalVisible(false);
-    setResultVisible(true);
-  }, [gameFinished]);
+    if (!isTutorial) {
+      setResultVisible(true);
+    }
+  }, [gameFinished]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // チュートリアル完了モーダルは、最後のミッション達成メッセージを閉じてから表示する
+  useEffect(() => {
+    if (!isTutorial || !gameFinished || currentMission !== null) return;
+    setTutorialCompleteVisible(true);
+  }, [isTutorial, gameFinished, currentMission]);
 
   const scoreBreakdown = useMemo(
     () => computeScore(game),
@@ -154,6 +188,10 @@ export function GameScreen({ replayLogs }: Props) {
 
   // ── プロットナビゲーション ────────────────────────────────────
   const [selectedPlotIndex, setSelectedPlotIndex] = useState<PlotIndex>(4);
+
+  // ── プロット表示トリガー（チュートリアルのみ）────────────────
+  const { currentTrigger, dismissTrigger } =
+    usePlotTriggers(tutorialStage, selectedPlotIndex, missionStatuses, gameStarted);
   const currentIndexSv = useSharedValue<number>(4);
 
   const unlockedPhases = useMemo(
@@ -399,7 +437,10 @@ export function GameScreen({ replayLogs }: Props) {
 
       {/* 下部操作バー */}
       <View style={styles.bottomBar}>
-        <TimerBar remaining={remaining} sessionDurationMs={game.sessionDurationMs} />
+        {isTutorial
+          ? <MissionBar statuses={missionStatuses} />
+          : <TimerBar remaining={remaining} sessionDurationMs={game.sessionDurationMs} />
+        }
         <View style={styles.fundsDisplay}>
           <Text style={[styles.fundsLabel, { color: colors.textSecondary }]}>資金</Text>
           <Text style={[styles.fundsValue, { color: colors.text }]}>
@@ -457,16 +498,44 @@ export function GameScreen({ replayLogs }: Props) {
       />
 
       {/* ゲームスタートオーバーレイ */}
-      {!gameStarted && <StartOverlay onStart={handleStart} />}
+      {!gameStarted && (
+        <StartOverlay
+          onStart={handleStart}
+          title={tutorialStage?.startOverlay.title}
+          body={tutorialStage?.startOverlay.body}
+          buttonLabel={tutorialStage?.startOverlay.buttonLabel}
+        />
+      )}
 
-      {/* リザルトモーダル */}
-      <ResultModal
-        visible={resultVisible}
-        breakdown={scoreBreakdown}
-        onRestart={handleRestart}
-        onClose={() => setResultVisible(false)}
-        logs={game.logs}
-      />
+      {/* ミッション達成モーダル（チュートリアルのみ） */}
+      {isTutorial && (
+        <MissionCompleteModal mission={currentMission} onDismiss={dismissCurrent} />
+      )}
+
+      {/* プロット表示トリガーモーダル（チュートリアルのみ） */}
+      {isTutorial && (
+        <TutorialHintModal trigger={currentTrigger} onDismiss={dismissTrigger} />
+      )}
+
+      {/* チュートリアル完了モーダル */}
+      {isTutorial && tutorialStage && (
+        <TutorialCompleteModal
+          visible={tutorialCompleteVisible}
+          stage={tutorialStage}
+          onClose={onTutorialComplete ?? handleRestart}
+        />
+      )}
+
+      {/* リザルトモーダル（通常モードのみ） */}
+      {!isTutorial && (
+        <ResultModal
+          visible={resultVisible}
+          breakdown={scoreBreakdown}
+          onRestart={handleRestart}
+          onClose={() => setResultVisible(false)}
+          logs={game.logs}
+        />
+      )}
     </SafeAreaView>
   );
 }
