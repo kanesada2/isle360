@@ -1,6 +1,6 @@
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, useColorScheme } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,10 +17,6 @@ import { StartOverlay } from '@/components/start-overlay';
 import { TimerBar } from '@/components/timer-bar';
 import { TutorialCompleteModal } from '@/components/tutorial-complete-modal';
 import { TutorialHintModal } from '@/components/tutorial-hint-modal';
-import { createTutorialGame } from '@/domain/tutorial';
-import type { TutorialStage } from '@/domain/tutorial';
-import { useMissions } from '@/hooks/use-missions';
-import { usePlotTriggers } from '@/hooks/use-plot-triggers';
 import { Colors, Spacing } from '@/constants/theme';
 import {
   applyReplayEvent,
@@ -37,9 +33,13 @@ import {
 import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
 import { createGame } from '@/domain/game';
 import type { ResearchCatalogEntry } from '@/domain/research-catalog';
+import { getAvailableFacilityKeys, getUnlockedPhases } from '@/domain/research-unlock';
+import type { TutorialStage } from '@/domain/tutorial';
+import { createTutorialGame } from '@/domain/tutorial';
 import type { Game, GameLogEntry, PlotIndex, ResearchId, ResourcePhase } from '@/domain/types';
 import { useGameLoop } from '@/hooks/use-game-loop';
-import { getAvailableFacilityKeys, getUnlockedPhases } from '@/domain/research-unlock';
+import { useMissions } from '@/hooks/use-missions';
+import { usePlotTriggers } from '@/hooks/use-plot-triggers';
 
 const SESSION_DURATION_MS = 360_000;
 const INITIAL_FUNDS = 1_000;
@@ -156,6 +156,23 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
   const { statuses: missionStatuses, currentMission, dismissCurrent, allDone: missionAllDone } =
     useMissions(tutorialStage, game, gameStarted);
 
+  // 最後に閉じたヒントモーダルの内容（「?」ボタンで再表示）
+  const [lastHint, setLastHint] = useState<{ title?: string; body: string; buttonLabel?: string } | null>(null);
+  const [lastHintVisible, setLastHintVisible] = useState(false);
+
+  // チュートリアルスタートヒント（StartOverlay の代替）
+  const [startHintDismissed, setStartHintDismissed] = useState(false);
+  const tutorialStartHint = (isTutorial && tutorialStage && !startHintDismissed)
+    ? { title: tutorialStage.startOverlay.title, body: tutorialStage.startOverlay.body, buttonLabel: tutorialStage.startOverlay.buttonLabel ?? 'スタート' }
+    : null;
+
+  const handleDismissMission = useCallback(() => {
+    if (currentMission?.completionMessage) {
+      setLastHint({ title: currentMission.label, body: currentMission.completionMessage });
+    }
+    dismissCurrent();
+  }, [currentMission, dismissCurrent]);
+
   // 全ミッション達成でゲームを終了させる
   useEffect(() => {
     if (!isTutorial || !missionAllDone || gameFinished || !gameStarted) return;
@@ -192,6 +209,17 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
   // ── プロット表示トリガー（チュートリアルのみ）────────────────
   const { currentTrigger, dismissTrigger } =
     usePlotTriggers(tutorialStage, selectedPlotIndex, missionStatuses, gameStarted);
+
+  const handleDismissTrigger = useCallback(() => {
+    if (currentTrigger) {
+      setLastHint({ title: currentTrigger.title, body: currentTrigger.body, buttonLabel: currentTrigger.buttonLabel });
+    }
+    dismissTrigger();
+  }, [currentTrigger, dismissTrigger]);
+
+  // トリガーモーダル・ミッション達成モーダルのいずれか表示中のヒント（統合）
+  const visibleHint = currentTrigger ?? (lastHintVisible ? lastHint : null);
+  const handleDismissHint = currentTrigger ? handleDismissTrigger : () => setLastHintVisible(false);
   const currentIndexSv = useSharedValue<number>(4);
 
   const unlockedPhases = useMemo(
@@ -268,6 +296,14 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
     setGame((g) => startGame(g, t));
     setNow(t);
   }, []);
+
+  const handleDismissStartHint = useCallback(() => {
+    if (tutorialStage) {
+      setLastHint({ title: tutorialStage.startOverlay.title, body: tutorialStage.startOverlay.body, buttonLabel: tutorialStage.startOverlay.buttonLabel });
+    }
+    setStartHintDismissed(true);
+    handleStart();
+  }, [tutorialStage, handleStart]);
 
   const handleRestart = useCallback(() => {
     router.replace('/');
@@ -349,6 +385,12 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
     [cycleSpeed],
   );
 
+  const showLastHint = useCallback(() => { setTimeout(() => setLastHintVisible(true), 0); }, []);
+  const hintButtonTapGesture = useMemo(
+    () => Gesture.Tap().onEnd(() => { 'worklet'; runOnJS(showLastHint)(); }),
+    [showLastHint],
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* フェーズ別資源バー */}
@@ -376,6 +418,15 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
             <GestureDetector gesture={speedBadgeTapGesture}>
               <View style={[styles.speedBadge, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
                 <Text style={styles.speedBadgeText}>{speedMultiplier}×</Text>
+              </View>
+            </GestureDetector>
+          )}
+
+          {/* ヒント再表示ボタン（チュートリアルのみ） */}
+          {isTutorial && lastHint && (
+            <GestureDetector gesture={hintButtonTapGesture}>
+              <View style={[styles.hintButton, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+                <Text style={styles.hintButtonText}>?</Text>
               </View>
             </GestureDetector>
           )}
@@ -497,24 +548,24 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
         demolishDisabled={isReplay}
       />
 
-      {/* ゲームスタートオーバーレイ */}
-      {!gameStarted && (
-        <StartOverlay
-          onStart={handleStart}
-          title={tutorialStage?.startOverlay.title}
-          body={tutorialStage?.startOverlay.body}
-          buttonLabel={tutorialStage?.startOverlay.buttonLabel}
-        />
+      {/* ゲームスタートオーバーレイ（通常モードのみ） */}
+      {!gameStarted && !isTutorial && (
+        <StartOverlay onStart={handleStart} />
+      )}
+
+      {/* チュートリアルスタートヒント（TutorialHintModal として表示） */}
+      {isTutorial && (
+        <TutorialHintModal hint={tutorialStartHint} onDismiss={handleDismissStartHint} />
       )}
 
       {/* ミッション達成モーダル（チュートリアルのみ） */}
       {isTutorial && (
-        <MissionCompleteModal mission={currentMission} onDismiss={dismissCurrent} />
+        <MissionCompleteModal mission={currentMission} onDismiss={handleDismissMission} />
       )}
 
-      {/* プロット表示トリガーモーダル（チュートリアルのみ） */}
+      {/* プロット表示トリガー・再表示モーダル（チュートリアルのみ） */}
       {isTutorial && (
-        <TutorialHintModal trigger={currentTrigger} onDismiss={dismissTrigger} />
+        <TutorialHintModal hint={visibleHint} onDismiss={handleDismissHint} />
       )}
 
       {/* チュートリアル完了モーダル */}
@@ -573,6 +624,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+  },
+  hintButton: {
+    position: 'absolute',
+    top: Spacing.two,
+    right: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hintButtonText: {
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: '700',
   },
   miniMap: {
     flexDirection: 'row',

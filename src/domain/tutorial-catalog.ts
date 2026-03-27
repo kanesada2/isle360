@@ -98,7 +98,7 @@ export const TUTORIAL_CATALOG: readonly TutorialCatalogEntry[] = [
       ],
       completionModal: {
         title: 'ミッション完了！',
-        body: '研究を進めると。出来ることが増えていく。\n次のステージではアンロックした「鉱物調査」を研究し、鉱山を建てよう。',
+        body: '研究を進めると、出来ることが増える。\n次のステージではアンロックした「鉱物調査」を研究し、鉱山を建てよう。',
         buttonLabel: '次のステージへ',
       },
     },

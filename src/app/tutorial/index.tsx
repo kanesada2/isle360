@@ -25,11 +25,14 @@ export default function TutorialIndexScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.backButton,
-            { backgroundColor: pressed ? colors.backgroundSelected : 'transparent' },
+            { 
+              backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
+              borderColor: colors.text,
+            },
           ]}
           onPress={() => router.replace('/')}
         >
-          <Text style={[styles.backButtonText, { color: colors.text }]}>＜ トップへ</Text>
+          <Text style={[styles.backButtonText, { color: colors.text }]}>トップへ</Text>
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text }]}>チュートリアル</Text>
         <View style={styles.backButton} />
@@ -86,9 +89,11 @@ const styles = StyleSheet.create({
   },
   backButton: {
     width: 90,
+    borderWidth: 1,
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.two,
-    borderRadius: Spacing.one,
+    borderRadius: Spacing.five,
+    alignItems: 'center'
   },
   backButtonText: {
     fontSize: 14,

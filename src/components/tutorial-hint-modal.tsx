@@ -2,14 +2,18 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, useColorScheme } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
-import type { PlotViewTrigger } from '@/domain/tutorial';
+export type HintContent = {
+  title?: string;
+  body: string;
+  buttonLabel?: string;
+};
 
 type Props = {
-  trigger: PlotViewTrigger | null;
+  hint: HintContent | null;
   onDismiss: () => void;
 };
 
-export function TutorialHintModal({ trigger, onDismiss }: Props) {
+export function TutorialHintModal({ hint: trigger, onDismiss }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
