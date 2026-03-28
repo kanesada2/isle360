@@ -120,7 +120,7 @@ export function getMineralBuildDiscountRate(
   const mineralDeposit = plots[plotIndex].deposits.find((d) => d.type === 'mineral');
   if (!mineralDeposit) return 0;
   const effLevel = completedResearch.get(ALTERNATIVITY_EFFICIENCY_KEY) ?? 0;
-  return Math.min(1, mineralDeposit.abundance * 0.0002 * Math.pow(1.3, effLevel));
+  return Math.min(1, mineralDeposit.abundance * 0.0002 * Math.pow(1.2, effLevel));
 }
 
 function getRefineryResearchMultiplier(completedResearch: Map<ResearchId, number>): number {
@@ -424,7 +424,7 @@ export function tickFacilities(game: Game, now: number): Game {
       const deltaSec = (now - deposit.lastRegenAt) / 1000;
       const regenLevel = newPlayer.completedResearch.get(REGEN_EFFICIENCY_KEY) ?? 0;
       const regenMultiplier = Math.pow(1.2, regenLevel);
-      const regenAmount = deposit.abundance * 0.004 * regenMultiplier * deltaSec;
+      const regenAmount = deposit.abundance * 0.003 * regenMultiplier * deltaSec;
       const newCurrent = Math.min(deposit.abundance, deposit.current + regenAmount);
       changed = true;
       return {

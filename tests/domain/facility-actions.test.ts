@@ -1,19 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  buildFacility,
-  demolishFacility,
-  tickFacilities,
-  startResearch,
-  getResearchCost,
-  computeScore,
-  computeFundsPerSecond,
   BUILD_DURATION_MS,
+  buildFacility,
+  computeFundsPerSecond,
+  computeScore,
   DEMOLISH_DURATION_MS,
+  demolishFacility,
+  getResearchCost,
   RESEARCH_DURATION_MS,
+  startResearch,
+  tickFacilities,
 } from "../../src/domain/facility-actions";
 import { FACILITY_CATALOG } from "../../src/domain/facility-catalog";
 import { RESEARCH_CATALOG } from "../../src/domain/research-catalog";
-import { getUnlockedPhases, getAvailableFacilityKeys } from "../../src/domain/research-unlock";
+import { getAvailableFacilityKeys, getUnlockedPhases } from "../../src/domain/research-unlock";
 import type { Game, GameId, PlayerId, Plot, ResearchId } from "../../src/domain/types";
 
 // ── ヘルパー ──────────────────────────────────────────────────
@@ -400,7 +400,7 @@ describe("再生栽培", () => {
   }
 
   it("researchDurationMs が 60_000ms である", () => {
-    expect(SUSTAINABLE_FARMING.researchDurationMs).toBe(60_000);
+    expect(SUSTAINABLE_FARMING.researchDurationMs).toBe(75_000);
   });
 
   it("special フラグが true である", () => {
@@ -411,7 +411,7 @@ describe("再生栽培", () => {
     const { game: g0, labId, researchStart } = setupIdleLab(10_000);
     const game = startResearch(g0, labId, SUSTAINABLE_FARMING, researchStart);
     const lab = game.facilities.get(labId)!;
-    expect(lab.currentJob?.durationMs).toBe(60_000);
+    expect(lab.currentJob?.durationMs).toBe(75_000);
   });
 
   it("15_000ms 後のティックでは研究が完了しない（通常の RESEARCH_DURATION_MS より長い）", () => {
@@ -426,13 +426,13 @@ describe("再生栽培", () => {
   it("60_000ms 後のティックで研究が完了し completedResearch に登録される", () => {
     const { game: g0, labId, researchStart } = setupIdleLab(10_000);
     let game = startResearch(g0, labId, SUSTAINABLE_FARMING, researchStart);
-    game = tickFacilities(game, researchStart + 60_000);
+    game = tickFacilities(game, researchStart + 75_000);
 
     expect(game.player.completedResearch.get(r("sustainable-farming"))).toBe(1);
     expect(game.facilities.get(labId)!.state).toBe("idle");
   });
 
-  it("研究完了後、農産資源が abundance × 0.005 / 秒 のペースで再生する", () => {
+  it("研究完了後、農産資源が abundance × 0.003 / 秒 のペースで再生する", () => {
     // 農産資源を0まで枯渇させてから sustainable-farming を適用
     let game = makeGame(10_000, research(["sustainable-farming", 1]));
     game = {
@@ -450,7 +450,7 @@ describe("再生栽培", () => {
     game = tickFacilities(game, NOW + 1_000);
 
     // abundance=1000, rate=0.005/s, 1s → +5
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(5, 1);
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(3, 1);
   });
 
   it("再生量は abundance を上限とする（上限を超えない）", () => {
@@ -515,7 +515,7 @@ describe("再生栽培", () => {
     expect(energy.current).toBe(0);
   });
 
-  it("再生ペースは abundance に比例する（abundance=500 なら +2.5/秒）", () => {
+  it("再生ペースは abundance に比例する（abundance=500 なら +1.5/秒）", () => {
     let game = makeGame(10_000, research(["sustainable-farming", 1]));
     game = {
       ...game,
@@ -529,8 +529,8 @@ describe("再生栽培", () => {
     game = tickFacilities(game, NOW);
     game = tickFacilities(game, NOW + 1_000);
 
-    // 500 × 0.005 × 1 = 2.5
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(2.5, 1);
+    // 500 × 0.003 × 1 = 1.5
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(1.5, 1);
   });
 });
 
@@ -565,8 +565,8 @@ describe("再生効率向上", () => {
     game = tickFacilities(game, NOW);
     game = tickFacilities(game, NOW + 1_000);
 
-    // 1000 × 0.005 × 1.2^1 × 1s = 6
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(6, 1);
+    // 1000 × 0.003 × 1.2^1 × 1s = 6
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(3.6, 1);
   });
 
   it("regen-efficiency Lv2 で再生速度が 1.44 倍になる", () => {
@@ -583,8 +583,8 @@ describe("再生効率向上", () => {
     game = tickFacilities(game, NOW);
     game = tickFacilities(game, NOW + 1_000);
 
-    // 1000 × 0.005 × 1.2^2 × 1s = 7.2
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(7.2, 1);
+    // 1000 × 0.003 × 1.2^2 × 1s = 7.2
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(4.32, 1);
   });
 
   it("sustainable-farming なしでは regen-efficiency があっても再生しない", () => {
@@ -834,9 +834,9 @@ describe("ゲームログ", () => {
     game = buildFacility(game, 0, AGRI_ENTRY, NOW);
     game = tickFacilities(game, NOW + BUILD_DURATION_MS);
 
-    expect(game.logs).toHaveLength(1);
-    expect(game.logs[0].kind).toBe("construction-complete");
-    expect(game.logs[0].facilityKind).toBe("extractor");
+    expect(game.logs).toHaveLength(2);
+    expect(game.logs[1].kind).toBe("construction-complete");
+    expect(game.logs[1].facilityKind).toBe("extractor");
   });
 
   it("demolishFacility 呼び出し時に demolish-start ログが追加される", () => {
@@ -845,9 +845,9 @@ describe("ゲームログ", () => {
     game = tickFacilities(game, NOW + BUILD_DURATION_MS);
     game = demolishFacility(game, 0, NOW + BUILD_DURATION_MS);
 
-    expect(game.logs).toHaveLength(2); // construction-complete + demolish-start
-    expect(game.logs[1].kind).toBe("demolish-start");
-    expect(game.logs[1].facilityKind).toBe("extractor");
+    expect(game.logs).toHaveLength(3); // construction-complete + demolish-start
+    expect(game.logs[2].kind).toBe("demolish-start");
+    expect(game.logs[2].facilityKind).toBe("extractor");
   });
 
   it("研究完了時に research-complete ログが追加される", () => {
@@ -870,7 +870,7 @@ describe("ゲームログ", () => {
     game = buildFacility(game, 0, AGRI_ENTRY, NOW);
     game = tickFacilities(game, NOW + BUILD_DURATION_MS);
 
-    const log = game.logs[0];
+    const log = game.logs[1];
     expect(log.elapsedMs).toBe(BUILD_DURATION_MS);
     expect(typeof log.score).toBe("number");
     expect(typeof log.fundsPerSecond).toBe("number");

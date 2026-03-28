@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "agent": "vitest run --config vitest.agent.config.ts"
   },
   "dependencies": {
     "@react-navigation/bottom-tabs": "^7.15.5",

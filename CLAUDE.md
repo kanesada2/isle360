@@ -93,10 +93,10 @@ Extractor 追加フィールド:
 - 再生栽培研究後は資源が回復するため、効率研究の価値が上がる
 
 ### 精製（Refinery）
-- 効果範囲：周囲**8マス**（斜め含む）の稼働中 Extractor に適用
+- 効果範囲：**グリッド全体**（Extractor 自身のマスを除く全8マス）の稼働中 Extractor に適用
 - 有効倍率 = `1.2^(L+1)`（L = `refinery-efficiency` 研究レベル）
-- 複数 Refinery が隣接している場合は積算（乗算）
-- 最適配置：**中央（Plot 4）が唯一の全8マスカバー位置**
+- 複数 Refinery がある場合は積算（乗算）
+- 位置依存性なし：どこに置いても効果は同じ
 
 ### 建設・破壊
 - 建設: 20秒、実コスト = `entry.buildCost × (1 - 鉱物割引率)`
@@ -198,15 +198,30 @@ useGameLoop((currentNow) => {
 2. **`tickFacilities` は変化なし時に同一参照を返す**（不要な再レンダリング防止）
 3. **`CatalogModal`** が建設・研究モーダルの共通 UI を担う
 4. **採掘効率研究 = タイミング効果のみ**（再生なし時の総収益は資源量×フェーズ×精製倍率で決まる）
-5. **精製工場の中央配置が支配的戦略**（全8マスカバー、精製研究Lv1+ で2基目も採算）
+5. **精製工場は位置依存なし**（どこに置いても全 Extractor に効く、配置自由）
 6. **`deposit.totalMined` がスコア計算の正規ソース**（再生で `current` が戻っても正確な採掘合計を保持）
 7. **`special: true` 研究**はゴールドのボーダー・バッジ付きで表示（CatalogModal が `CatalogModalItem.special` を参照）
 8. **研究時間はカタログの `researchDurationMs` で上書き可能**（未指定は 15秒のデフォルト）
 
 ---
 
-## 未実装（今後の課題）
+## React Native UI の既知の落とし穴
 
-- Laboratory の効果（複数建設による研究並列・加速）
-- Monument の制約（1基完成まで次を建設不可）の UI 制御
+### モーダルを開く時は setTimeout を利用する
+
+`GestureDetector` のタップハンドラーから `setState` で Modal を表示すると、同一タッチイベントがモーダルのバックドロップ `Pressable` にも届き、即座に閉じてしまう。
+
+```ts
+// NG: タップと同フレームで visible=true になり即閉じる
+const showModal = useCallback(() => setVisible(true), []);
+
+// OK: 0msのsetTimeoutでvisible=trueになるタイミングを遅らせる
+const showModal = useCallback(() => { setTimeout(() => setVisible(true), 0); }, []);
+```
+
+`GestureDetector` 内のボタン（速度バッジ、ヒントボタン等）からモーダルを開く場合は必ずこのパターンを使う。
+
+---
+
+## 未実装（今後の課題）
 - ゲーム終了処理（status: "finished" への遷移とスコア画面）
