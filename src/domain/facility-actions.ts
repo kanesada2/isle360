@@ -424,7 +424,7 @@ export function tickFacilities(game: Game, now: number): Game {
       const deltaSec = (now - deposit.lastRegenAt) / 1000;
       const regenLevel = newPlayer.completedResearch.get(REGEN_EFFICIENCY_KEY) ?? 0;
       const regenMultiplier = Math.pow(1.2, regenLevel);
-      const regenAmount = deposit.abundance * 0.003 * regenMultiplier * deltaSec;
+      const regenAmount = deposit.abundance * 0.0025 * regenMultiplier * deltaSec;
       const newCurrent = Math.min(deposit.abundance, deposit.current + regenAmount);
       changed = true;
       return {
