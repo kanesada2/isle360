@@ -2,14 +2,14 @@
  * 離散イベントシミュレーションのコアループ。
  * 決定点を計算し、tickFacilities で時刻をジャンプしながら decide を呼ぶ。
  */
-import { tickFacilities, buildFacility, demolishFacility, startResearch, getResearchCost, computeFundsPerSecond } from '../../src/domain/facility-actions';
+import { buildFacility, computeFundsPerSecond, demolishFacility, getResearchCost, startResearch, tickFacilities } from '../../src/domain/facility-actions';
 import { FACILITY_CATALOG } from '../../src/domain/facility-catalog';
 import { RESEARCH_CATALOG } from '../../src/domain/research-catalog';
 import { getAvailableFacilityKeys } from '../../src/domain/research-unlock';
 import type { Game } from '../../src/domain/types';
-import type { Action } from './types';
 import { decide } from './policy';
 import { effectiveBuildMs, isResearchAvailable } from './roi';
+import type { Action } from './types';
 
 // ── メインループ ─────────────────────────────────────────────────
 
@@ -20,12 +20,8 @@ export function runAgent(game: Game): Game {
 
   while (now <= endAt) {
     // まずアクションを貪欲に実行（tick より先に decide → t=0 から即座に動く）
-    let safetyLimit = 20;
-    while (safetyLimit-- > 0) {
-      const action = decide(game, now);
-      if (!action) break;
-      game = applyAction(game, action, now);
-    }
+    const action = decide(game, now);
+    if (action) game = applyAction(game, action, now);
 
     if (now >= endAt) break;
 
@@ -33,7 +29,7 @@ export function runAgent(game: Game): Game {
     const nextAt = Math.min(nextDecisionTime(game, now, endAt), endAt);
     if (nextAt <= now) break; // 安全弁：無限ループ防止
     game = tickFacilities(game, nextAt);
-    now  = nextAt;
+    now  = nextAt + 1; // 同時2アクション防止
   }
   return game;
 }
@@ -67,6 +63,9 @@ function nextDecisionTime(game: Game, now: number, endAt: number): number {
   const remainder = remaining % effBuild;
   const untilCountDown = remainder > 0 ? remainder : effBuild;
   next = Math.min(next, now + untilCountDown);
+
+  // 4. 1秒後
+  next = Math.min(next, now + 1000);
 
   return next;
 }

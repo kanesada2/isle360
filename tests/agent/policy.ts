@@ -82,6 +82,15 @@ function pickBestAction(game: Game, remaining: number): Action | null {
       }
     }
   }
+  // ── 解体候補
+  for (const [id, f] of game.facilities) {
+    if(f.kind !== 'extractor') continue;
+    if(f.state !== 'idle') continue;
+    const extractingResource = game.plots[f.plotIndex].deposits.find(deposit => deposit.type == f.resourceType);
+    if(extractingResource?.current === 0){
+      candidates.push({ action: { kind: 'demolish', plotIndex: f.plotIndex }, gain: Infinity, cost: f.demolishCost });
+    }
+  }
 
   if (candidates.length === 0) return null;
 
