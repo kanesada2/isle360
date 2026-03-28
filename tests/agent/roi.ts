@@ -33,7 +33,7 @@ export function effectiveDemolishMs(game: Game): number {
 // ── Refinery 乗数 ───────────────────────────────────────────────
 
 export function currentRefineryMult(game: Game): number {
-  const effLevel = game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
+  const effLevel = 1//一番資金効率がいいレベルで計算しておく game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
   const singleMult = Math.pow(1.2, 1 + effLevel);
   const count = [...game.facilities.values()].filter(
     f => f.kind === 'refinery' && f.state === 'idle',
@@ -43,7 +43,7 @@ export function currentRefineryMult(game: Game): number {
 
 /** Refinery を1基追加した場合の乗数 */
 export function refineryMultForNew(game: Game): number {
-  const effLevel = game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
+  const effLevel = 1//一番資金効率がいいレベルで計算しておく game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
   const singleMult = Math.pow(1.2, 1 + effLevel);
   return currentRefineryMult(game) * singleMult;
 }

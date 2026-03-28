@@ -138,8 +138,6 @@ export function optimalMonumentCount(game: Game, remaining: number): number {
   const maxByTime     = Math.min(Math.floor(remaining / effBuild), totalPlots);
   const maxByTimeDemo = Math.min(Math.floor((remaining - effDemolish) / effBuild), totalPlots);
 
-  const researchRoi = bestAvailableResearchROI(game, remaining);
-
   for (let count = maxByTime; count >= 1; count--) {
     const needDemo     = count > emptyPlots;
     const demoCount    = Math.min(Math.max(0, count - emptyPlots), demolishable);
@@ -150,16 +148,11 @@ export function optimalMonumentCount(game: Game, remaining: number): number {
     // 解体候補を「残存価値の低い順」で選ぶ
     const demoCandidates = lowestValueDemolishCandidates(game, demoCount, remaining);
     const demoCost   = demoCandidates.reduce((s, c) => s + c.demolishCost, 0);
-    // 解体で失う残存収入も実質コストに含める
-    const lostIncome = demoCandidates.reduce((s, c) => s + c.remainingValue, 0);
-    const totalCost  = count * 3_000 + demoCost + lostIncome;
 
     const buildStartMs = demoCount > 0 ? effDemolish : 0;
     const projected    = game.player.funds + (buildStartMs / 1000) * fps;
 
-    if (projected >= (count * 3_000 + demoCost) && // 支払い能力チェック（lostIncome は資金には含まない）
-        count * 5_000 > totalCost &&                // 利益チェック: monument ボーナス > 実質コスト
-        researchRoi < MONUMENT_ROI) return count;
+    if (projected >= (count * 3_000 + demoCost)) return count;
   }
   return 0;
 }
@@ -171,7 +164,7 @@ function decideMonumentAction(game: Game, remaining: number): Action | null {
   const isDemolishing = [...game.facilities.values()].some(
     f => f.state === 'demolishing',
   );
-  if (isBuilding || isDemolishing) return null;
+  if (isBuilding) return null;
 
   if (game.player.funds >= 3_000) {
     const emptyPlot     = findFirstEmptyPlot(game);
@@ -180,7 +173,7 @@ function decideMonumentAction(game: Game, remaining: number): Action | null {
       return { kind: 'build', plotIndex: emptyPlot, entry: monumentEntry };
     }
     const plotIndex = findLowestValueNonMonumentPlot(game, remaining);
-    if (plotIndex !== null) {
+    if (plotIndex !== null && !isDemolishing) {
       return { kind: 'demolish', plotIndex };
     }
   }
