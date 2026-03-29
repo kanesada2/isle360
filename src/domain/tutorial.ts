@@ -1,7 +1,6 @@
-import type { Extractor, Facility, FacilityId, Game, Monument, Player, PlotIndex, ResearchId, ResourceType } from './types';
-import type { Plot } from './types';
 import { FACILITY_CATALOG } from './facility-catalog';
 import { newFacilityId, newGameId, newPlayerId } from './id';
+import type { Extractor, Facility, FacilityId, Game, Monument, Player, Plot, PlotIndex, ResearchId, ResourceType } from './types';
 
 // ── Deposit Spec ───────────────────────────────────────────────────
 
@@ -138,11 +137,11 @@ function buildDeposits(spec?: PlotDepositSpec) {
   const mineral = spec?.mineral;
   const energy  = spec?.energy;
   return [
-    { type: 'agriculture' as const, phase: 1 as const,
+    { type: 'agriculture' as const, phase: 1 as const, gain: 1 as const,
       abundance: agri?.abundance    ?? 0, current: agri?.current    ?? agri?.abundance    ?? 0, totalMined: 0 },
-    { type: 'mineral'     as const, phase: 2 as const,
+    { type: 'mineral'     as const, phase: 2 as const, gain: 2 as const,
       abundance: mineral?.abundance ?? 0, current: mineral?.current ?? mineral?.abundance ?? 0, totalMined: 0 },
-    { type: 'energy'      as const, phase: 3 as const,
+    { type: 'energy'      as const, phase: 3 as const, gain: 4 as const,
       abundance: energy?.abundance  ?? 0, current: energy?.current  ?? energy?.abundance  ?? 0, totalMined: 0 },
   ];
 }
