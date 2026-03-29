@@ -1,8 +1,8 @@
-import { computeFundsPerSecond, getMineralBuildDiscountRate, getResearchCost } from '../../src/domain/facility-actions';
-import { FACILITY_CATALOG } from '../../src/domain/facility-catalog';
-import { RESEARCH_CATALOG } from '../../src/domain/research-catalog';
-import { getAvailableFacilityKeys } from '../../src/domain/research-unlock';
-import type { FacilityId, Game, Laboratory, PlotIndex, ResearchId } from '../../src/domain/types';
+import { computeFundsPerSecond, getMineralBuildDiscountRate, getResearchCost } from '../domain/facility-actions';
+import { FACILITY_CATALOG } from '../domain/facility-catalog';
+import { RESEARCH_CATALOG } from '../domain/research-catalog';
+import { getAvailableFacilityKeys } from '../domain/research-unlock';
+import type { FacilityId, Game, Laboratory, PlotIndex, ResearchId } from '../domain/types';
 import {
   bestExtractorIncomeForPlot,
   currentRefineryMult,

@@ -1,6 +1,6 @@
-import type { FacilityCatalogEntry } from '../../src/domain/facility-catalog';
-import type { ResearchCatalogEntry } from '../../src/domain/research-catalog';
-import type { FacilityId, PlotIndex } from '../../src/domain/types';
+import type { FacilityCatalogEntry } from '../domain/facility-catalog';
+import type { ResearchCatalogEntry } from '../domain/research-catalog';
+import type { FacilityId, PlotIndex } from '../domain/types';
 
 export type BuildAction    = { kind: 'build';    plotIndex: PlotIndex; entry: FacilityCatalogEntry };
 export type DemolishAction = { kind: 'demolish'; plotIndex: PlotIndex };

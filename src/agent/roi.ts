@@ -10,12 +10,12 @@ import {
   computeFundsPerSecond,
   getMineralBuildDiscountRate,
   getResearchCost,
-} from '../../src/domain/facility-actions';
-import type { FacilityCatalogEntry } from '../../src/domain/facility-catalog';
-import type { ResearchCatalogEntry } from '../../src/domain/research-catalog';
-import { RESEARCH_CATALOG } from '../../src/domain/research-catalog';
-import { isResearchAvailable as domainIsResearchAvailable } from '../../src/domain/research-unlock';
-import type { Extractor, Game, PlotIndex, ResearchId, ResourceType } from '../../src/domain/types';
+} from '../domain/facility-actions';
+import type { FacilityCatalogEntry } from '../domain/facility-catalog';
+import type { ResearchCatalogEntry } from '../domain/research-catalog';
+import { RESEARCH_CATALOG } from '../domain/research-catalog';
+import { isResearchAvailable as domainIsResearchAvailable } from '../domain/research-unlock';
+import type { Extractor, Game, PlotIndex, ResearchId, ResourceType } from '../domain/types';
 
 const r = (s: string) => s as ResearchId;
 
@@ -323,7 +323,7 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
   return 0;
 }
 
-/** 効率系研究に対応する施設が一基でも存在するか（建設中・idle 問わず） 
+/** 効率系研究に対応する施設が一基でも存在するか（建設中・idle 問わず）
  * extractorは二基でいく
 */
 function hasFacilityForEfficiency(game: Game, entry: ResearchCatalogEntry): boolean {

@@ -2,11 +2,11 @@
  * 離散イベントシミュレーションのコアループ。
  * 決定点を計算し、tickFacilities で時刻をジャンプしながら decide を呼ぶ。
  */
-import { buildFacility, computeFundsPerSecond, demolishFacility, getResearchCost, startResearch, tickFacilities } from '../../src/domain/facility-actions';
-import { FACILITY_CATALOG } from '../../src/domain/facility-catalog';
-import { RESEARCH_CATALOG } from '../../src/domain/research-catalog';
-import { getAvailableFacilityKeys } from '../../src/domain/research-unlock';
-import type { Game } from '../../src/domain/types';
+import { buildFacility, computeFundsPerSecond, demolishFacility, getResearchCost, startResearch, tickFacilities } from '../domain/facility-actions';
+import { FACILITY_CATALOG } from '../domain/facility-catalog';
+import { RESEARCH_CATALOG } from '../domain/research-catalog';
+import { getAvailableFacilityKeys } from '../domain/research-unlock';
+import type { Game } from '../domain/types';
 import { decide } from './policy';
 import { effectiveBuildMs, isResearchAvailable } from './roi';
 import type { Action } from './types';
@@ -29,7 +29,7 @@ export function runAgent(game: Game): Game {
     const nextAt = Math.min(nextDecisionTime(game, now, endAt), endAt);
     if (nextAt <= now) break; // 安全弁：無限ループ防止
     game = tickFacilities(game, nextAt);
-    now  = nextAt + 1; // 同時2アクション防止
+    now  = nextAt + 17; // 1フレーム待つ
   }
   return game;
 }
@@ -103,4 +103,3 @@ export function applyAction(game: Game, action: Action, now: number): Game {
       return startResearch(game, action.labId, action.entry, now);
   }
 }
-

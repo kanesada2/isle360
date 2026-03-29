@@ -4,7 +4,7 @@ import { computeScore, startGame } from '../../src/domain/facility-actions';
 import { createGame } from '../../src/domain/game';
 import { encodeLogs } from '../../src/domain/log-codec';
 import type { Game } from '../../src/domain/types';
-import { runAgent } from './index';
+import { runAgent } from '../../src/agent/index';
 
 const SESSION_MS = 360_000;
 const INITIAL_FUNDS = 1_000;

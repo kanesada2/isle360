@@ -12,8 +12,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { runAgent } from '@/agent';
 import { Colors, Spacing } from '@/constants/theme';
-import { decodeLogs } from '@/domain/log-codec';
+import { startGame } from '@/domain/facility-actions';
+import { createGame } from '@/domain/game';
+import { decodeLogs, encodeLogs } from '@/domain/log-codec';
 
 export default function TopScreen() {
   const router = useRouter();
@@ -22,6 +25,12 @@ export default function TopScreen() {
 
   const [replayModalVisible, setReplayModalVisible] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
+
+  function handleDemo() {
+    const game = runAgent(startGame(createGame({ sessionDurationMs: 360_000, initialFunds: 1_000 }), 0));
+    const token = encodeLogs(game.logs);
+    router.push({ pathname: '/replay', params: { token } });
+  }
 
   function handleReplayConfirm() {
     const token = tokenInput.trim();
@@ -64,6 +73,19 @@ export default function TopScreen() {
             onPress={() => router.push('/tutorial')}
           >
             <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Tutorial</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                borderColor: colors.text,
+                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
+              },
+            ]}
+            onPress={handleDemo}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Demo</Text>
           </Pressable>
 
           <Pressable
