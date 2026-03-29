@@ -2,8 +2,8 @@ import type { FacilityCatalogEntry } from './facility-catalog';
 import { FACILITY_CATALOG, getActualBuildCost } from './facility-catalog';
 import { newFacilityId } from './id';
 import { RESEARCH_CATALOG, getResearchCost, type ResearchCatalogEntry } from './research-catalog';
-export { getResearchCost } from './research-catalog';
 import type { Extractor, Facility, FacilityId, Game, GameLogEntry, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
+export { getResearchCost } from './research-catalog';
 
 export const BUILD_DURATION_MS = 20_000;
 export const DEMOLISH_DURATION_MS = 10_000;
@@ -370,14 +370,14 @@ export function tickFacilities(game: Game, now: number): Game {
       i === extractor.plotIndex ? { ...p, deposits: newDeposits } : p,
     );
 
-    // 隣接する稼働中 Refinery の精製倍率を計算して資金加算
+    // 稼働中 Refinery の精製倍率を計算して資金加算
     const refineryMult = calcRefineryMultiplier(
       extractor.plotIndex,
       newPlots,
       newFacilities,
       newPlayer.completedResearch,
     );
-    const fundsGained = actualExtract * deposit.phase * refineryMult;
+    const fundsGained = actualExtract * deposit.gain * refineryMult;
     newPlayer = {
       ...newPlayer,
       funds: Math.round((newPlayer.funds + fundsGained) * 100) / 100,
@@ -413,7 +413,7 @@ export function tickFacilities(game: Game, now: number): Game {
       const deltaSec = (now - deposit.lastRegenAt) / 1000;
       const regenLevel = newPlayer.completedResearch.get(REGEN_EFFICIENCY_KEY) ?? 0;
       const regenMultiplier = Math.pow(1.2, regenLevel);
-      const regenAmount = deposit.abundance * 0.0025 * regenMultiplier * deltaSec;
+      const regenAmount = deposit.abundance * 0.003 * regenMultiplier * deltaSec;
       const newCurrent = Math.min(deposit.abundance, deposit.current + regenAmount);
       changed = true;
       return {
@@ -514,7 +514,7 @@ export function computeFundsPerSecond(game: Game): number {
       game.facilities,
       game.player.completedResearch,
     );
-    total += unitsPerSec * deposit.phase * refineryMult;
+    total += unitsPerSec * deposit.gain * refineryMult;
   }
   return Math.round(total * 100) / 100;
 }

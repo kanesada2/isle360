@@ -61,7 +61,7 @@ export function incomeByResourceType(game: Game, resourceType: ResourceType): nu
     if (!deposit || deposit.current <= 0) continue;
     const effLevel = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[resourceType]) ?? 0;
     const unitsPerSec = Math.pow(1.2, effLevel) * 5; // OUTPUT_PER_CYCLE / (CYCLE_DURATION_MS/1000)
-    total += unitsPerSec * deposit.phase * currentRefineryMult(game);
+    total += unitsPerSec * deposit.gain * currentRefineryMult(game);
   }
   return total;
 }
@@ -81,19 +81,19 @@ export function extractorROI(
   const effLevel = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[entry.resourceType]) ?? 0;
   const unitsPerSec = Math.pow(1.2, effLevel) * 5;
   const refineMult = currentRefineryMult(game);
-  const incomePerSec = unitsPerSec * deposit.phase * refineMult;
+  const incomePerSec = unitsPerSec * deposit.gain * refineMult;
 
   const operatingMs = Math.max(0, remainingMs - effectiveBuildMs(game));
   // 実際の採掘量は deposit.current で上限
   const projectedIncome = Math.min(
     incomePerSec * (operatingMs / 1000),
-    deposit.current * deposit.phase * refineMult,
+    deposit.current * deposit.gain * refineMult,
   );
 
   const discountRate = getMineralBuildDiscountRate(plotIndex, game.plots, game.player.completedResearch);
   const cost = Math.max(1, entry.buildCost * (1 - discountRate));
 
-  // 機会費用補正: マス内の全資源の価値（abundance × phase）を比較し、
+  // 機会費用補正: マス内の全資源の価値（abundance × gain）を比較し、
   // 対象資源がそのマスで最も価値が低いほど ROI を減衰させる。
   // フェーズ未解放の鉱物・エネルギー deposit も含めて判断する。
   const dominance = plotResourceDominance(game.plots[plotIndex].deposits, entry.resourceType);
@@ -103,13 +103,13 @@ export function extractorROI(
 
 /**
  * マス内の全 deposit の中で対象資源が占める価値の割合。
- * 価値 = abundance × phase（フェーズ倍率を込みで比較する）。
+ * 価値 = abundance × gain（フェーズ倍率を込みで比較する）。
  * 0.0〜1.0 を返す（1.0 = そのマスで最も価値ある資源）。
  */
-function plotResourceDominance(deposits: { type: ResourceType; phase: number; abundance: number }[], resourceType: ResourceType): number {
+function plotResourceDominance(deposits: { type: ResourceType; phase: number; gain: number, abundance: number }[], resourceType: ResourceType): number {
   const targetValue = (deposits.find(d => d.type === resourceType)?.abundance ?? 0) *
-    (deposits.find(d => d.type === resourceType)?.phase ?? 1);
-  const maxValue = Math.max(...deposits.map(d => d.abundance * d.phase), 1);
+    (deposits.find(d => d.type === resourceType)?.gain ?? 1);
+  const maxValue = Math.max(...deposits.map(d => d.abundance * d.gain), 1);
   return targetValue / maxValue;
 }
 
@@ -147,7 +147,7 @@ export function bestExtractorIncomeForPlot(game: Game, plotIndex: PlotIndex, ope
     if (deposit.current <= 0) continue;
     const effLevel   = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[deposit.type]) ?? 0;
     const ratePerSec = Math.pow(1.2, effLevel) * 5;
-    const income = Math.min(ratePerSec * (operatingMs / 1000), deposit.current) * deposit.phase * refineMult;
+    const income = Math.min(ratePerSec * (operatingMs / 1000), deposit.current) * deposit.gain * refineMult;
     if (income > best) best = income;
   }
   return best;
@@ -290,7 +290,7 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
       if (!deposit || deposit.current <= 0) continue;
       const totalNow = Math.min(rateNow * operatingSec, deposit.current);
       const totalNew = Math.min(rateNew * operatingSec, deposit.current);
-      gain += (totalNew - totalNow) * deposit.phase * refineMult;
+      gain += (totalNew - totalNow) * deposit.gain * refineMult;
     }
     return gain;
   }
@@ -315,7 +315,7 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
       const level     = game.player.completedResearch.get(effKey) ?? 0;
       const ratePerSec = Math.pow(1.2, level) * 5;
       const futureMined = Math.min(ratePerSec * operatingSec, deposit.current);
-      gain += futureMined * deposit.phase * (newMult - curMult);
+      gain += futureMined * deposit.gain * (newMult - curMult);
     }
     return gain;
   }

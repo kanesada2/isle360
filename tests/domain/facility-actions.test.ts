@@ -32,9 +32,9 @@ function makeGame(
 ): Game {
   const plots: Plot[] = Array.from({ length: 9 }, () => ({
     deposits: [
-      { type: "agriculture" as const, phase: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
-      { type: "mineral" as const,     phase: 2 as const, abundance: 500,  current: 500,  totalMined: 0 },
-      { type: "energy" as const,      phase: 3 as const, abundance: 300,  current: 300,  totalMined: 0 },
+      { type: "agriculture" as const, phase: 1 as const, gain: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
+      { type: "mineral" as const,     phase: 2 as const, gain: 2 as const, abundance: 500,  current: 500,  totalMined: 0 },
+      { type: "energy" as const,      phase: 3 as const, gain: 4 as const, abundance: 300,  current: 300,  totalMined: 0 },
     ],
     facilityId: null,
   }));
@@ -432,7 +432,7 @@ describe("再生栽培", () => {
     expect(game.facilities.get(labId)!.state).toBe("idle");
   });
 
-  it("研究完了後、農産資源が abundance × 0.0025 / 秒 のペースで再生する", () => {
+  it("研究完了後、農産資源が abundance × 0.003 / 秒 のペースで再生する", () => {
     // 農産資源を0まで枯渇させてから sustainable-farming を適用
     let game = makeGame(10_000, research(["sustainable-farming", 1]));
     game = {
@@ -449,8 +449,8 @@ describe("再生栽培", () => {
     // 1秒後のティック
     game = tickFacilities(game, NOW + 1_000);
 
-    // abundance=1000, rate=0.005/s, 1s → +5
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(2.5, 1);
+    // abundance=1000, rate=0.003/s, 1s → +3
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(3, 1);
   });
 
   it("再生量は abundance を上限とする（上限を超えない）", () => {
@@ -529,8 +529,8 @@ describe("再生栽培", () => {
     game = tickFacilities(game, NOW);
     game = tickFacilities(game, NOW + 1_000);
 
-    // 500 × 0.0025 × 1 = 1.5
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(1.25, 1);
+    // 500 × 0.003 × 1 = 1.5
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(1.5, 1);
   });
 });
 
@@ -565,8 +565,8 @@ describe("再生効率向上", () => {
     game = tickFacilities(game, NOW);
     game = tickFacilities(game, NOW + 1_000);
 
-    // 1000 × 0.0025 × 1.2^1 × 1s = 3
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(3, 1);
+    // 1000 × 0.003 × 1.2^1 × 1s = 3.6
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(3.6, 1);
   });
 
   it("regen-efficiency Lv2 で再生速度が 1.44 倍になる", () => {
@@ -583,8 +583,8 @@ describe("再生効率向上", () => {
     game = tickFacilities(game, NOW);
     game = tickFacilities(game, NOW + 1_000);
 
-    // 1000 × 0.0025 × 1.2^2 × 1s = 3.6
-    expect(game.plots[0].deposits[0].current).toBeCloseTo(3.6, 1);
+    // 1000 × 0.003 × 1.2^2 × 1s = 4.32
+    expect(game.plots[0].deposits[0].current).toBeCloseTo(4.32, 1);
   });
 
   it("sustainable-farming なしでは regen-efficiency があっても再生しない", () => {
@@ -621,9 +621,9 @@ describe("鉱物活用建築", () => {
   function makeGameWithMineral(mineralAbundance: number, funds = 10_000, completedResearch = new Map<ResearchId, number>()): Game {
     const plots: Plot[] = Array.from({ length: 9 }, (_, i) => ({
       deposits: [
-        { type: "agriculture" as const, phase: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
-        { type: "mineral" as const,     phase: 2 as const, abundance: i === 0 ? mineralAbundance : 500, current: i === 0 ? mineralAbundance : 500, totalMined: 0 },
-        { type: "energy" as const,      phase: 3 as const, abundance: 300,  current: 300,  totalMined: 0 },
+        { type: "agriculture" as const, phase: 1 as const, gain: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
+        { type: "mineral" as const,     phase: 2 as const, gain: 2 as const, abundance: i === 0 ? mineralAbundance : 500, current: i === 0 ? mineralAbundance : 500, totalMined: 0 },
+        { type: "energy" as const,      phase: 3 as const, gain: 4 as const, abundance: 300,  current: 300,  totalMined: 0 },
       ],
       facilityId: null,
     }));
@@ -893,11 +893,11 @@ describe("ゲームログ", () => {
     expect(computeFundsPerSecond(makeGame())).toBe(0);
   });
 
-  it("computeFundsPerSecond: idle の農場1基（phase1, no refinery）は 5 G/s", () => {
+  it("computeFundsPerSecond: idle の農場1基（gain1, no refinery）は 5 G/s", () => {
     let game = makeGame();
     game = buildFacility(game, 0, AGRI_ENTRY, NOW);
     game = tickFacilities(game, NOW + BUILD_DURATION_MS);
-    // 1 unit/cycle × 1000ms/s ÷ 200ms/cycle × phase1 = 5
+    // 1 unit/cycle × 1000ms/s ÷ 200ms/cycle × gain1 = 5
     expect(computeFundsPerSecond(game)).toBe(5);
   });
 });

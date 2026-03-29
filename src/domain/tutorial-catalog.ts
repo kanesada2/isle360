@@ -230,7 +230,7 @@ export const TUTORIAL_CATALOG: readonly TutorialCatalogEntry[] = [
           count: 1,
           label: 'エネルギー生産場を1つ建設する',
           completionMessage: 'エネルギー生産場が建設された。\n' +
-          'エネルギー資源は農産資源の3倍の資金を生産できる。'
+          'エネルギー資源は農産資源の4倍の資金を生産できる。'
         }
       ],
       plotTriggers: [

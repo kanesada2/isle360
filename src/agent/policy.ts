@@ -263,7 +263,7 @@ function facilityRemainingValue(
   if (f.kind === 'extractor') {
     const deposit = game.plots[plotIndex].deposits.find(d => d.type === f.resourceType);
     if (!deposit) return 0;
-    return deposit.current * deposit.phase * currentRefineryMult(game);
+    return deposit.current * deposit.gain * currentRefineryMult(game);
   }
   if (f.kind === 'refinery') {
     const effLevel    = game.player.completedResearch.get('refinery-efficiency' as ResearchId) ?? 0;

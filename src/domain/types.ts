@@ -8,12 +8,15 @@ export type ResearchId  = Brand<string, "ResearchId">;
 // ── Resource ─────────────────────────────────────────────────────
 export type ResourcePhase = 1 | 2 | 3;
 
+export type resourceGain = 1 | 2 | 4;
+
 // Phase 1=農産 / Phase 2=鉱物 / Phase 3=エネルギー
 export type ResourceType = "agriculture" | "mineral" | "energy";
 
 export type ResourceDeposit = {
   type:         ResourceType;
   phase:        ResourcePhase;
+  gain:         resourceGain;
   abundance:    number;  // 最大量（マップ表示のヒントにも使う）
   current:      number;  // 現在の残量（採掘により減少）
   totalMined:   number;  // 累積採掘量（再生分も含めた正確な採掘合計）
