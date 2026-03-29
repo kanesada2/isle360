@@ -1,4 +1,4 @@
-import type { Facility, ResearchId, ResourceType } from "./types";
+import type { Facility, FacilityId, ResearchId, ResourceType } from "./types";
 
 export type FacilityCatalogEntry = {
   /** カタログ内での一意キー */
@@ -15,6 +15,30 @@ export type FacilityCatalogEntry = {
   /** 建設に必要な研究カタログキー。未指定なら初期から建設可能 */
   requiredResearchKey?: ResearchId;
 };
+
+/** 割引率を適用した実際の建設コストを返す */
+export function getActualBuildCost(entry: FacilityCatalogEntry, discountRate: number): number {
+  return Math.round(entry.buildCost * (1 - discountRate));
+}
+
+/**
+ * 指定した施設が建設可能かどうかを返す。
+ * - 前提研究完了済み
+ * - 資金が足りている
+ * - monument が建設中でない（monument の場合）
+ */
+export function isFacilityAvailable(
+  entry: FacilityCatalogEntry,
+  completedResearch: Map<ResearchId, number>,
+  funds: number,
+  discountRate: number,
+  facilities: Map<FacilityId, Facility>,
+): boolean {
+  if (entry.requiredResearchKey && !completedResearch.has(entry.requiredResearchKey)) return false;
+  if (getActualBuildCost(entry, discountRate) > funds) return false;
+  if (entry.kind === 'monument' && [...facilities.values()].some((f) => f.kind === 'monument' && f.state === 'constructing')) return false;
+  return true;
+}
 
 const r = (s: string) => s as ResearchId;
 

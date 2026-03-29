@@ -17,6 +17,21 @@ export type ResearchCatalogEntry = {
   special?: boolean;
 };
 
+export const MAX_RESEARCH_LEVEL = 5;
+
+/**
+ * 繰り返し研究の現在コストを返す（baseCost × 1.5^currentLevel）。
+ * 非繰り返し研究はそのまま baseCost を返す。
+ */
+export function getResearchCost(
+  entry: ResearchCatalogEntry,
+  completedResearch: Map<ResearchId, number>,
+): number {
+  if (!entry.repeatable) return entry.baseCost;
+  const currentLevel = completedResearch.get(entry.key) ?? 0;
+  return Math.round(entry.baseCost * Math.pow(1.5, currentLevel));
+}
+
 const r = (s: string) => s as ResearchId;
 
 export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
@@ -24,7 +39,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("agri-efficiency"),
     name: "農産物採集効率上昇",
     description:
-      "農場の採集速度が 20% 向上する。繰り返し研究するたびにさらに 20% 積み重ねられるが、研究コストは毎回 50% 増加する。",
+      "農場の採集速度が 20% 向上する。Lv.5まで繰り返し研究可能だが、コストは毎回 50% 増加する。",
     baseCost: 100,
     repeatable: true,
     prerequisites: [],
@@ -43,7 +58,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("mineral-efficiency"),
     name: "鉱物採掘効率向上",
     description:
-      "鉱山の採掘速度が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加。鉱物調査の完了が前提。",
+      "鉱山の採掘速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。鉱物調査の完了が前提。",
     baseCost: 200,
     repeatable: true,
     prerequisites: [r("mineral-survey")],
@@ -62,7 +77,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("energy-efficiency"),
     name: "エネルギー獲得効率向上",
     description:
-      "エネルギー生産場の速度が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加。エネルギー資源調査の完了が前提。",
+      "エネルギー生産場の速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。エネルギー資源調査の完了が前提。",
     baseCost: 300,
     repeatable: true,
     prerequisites: [r("energy-survey")],
@@ -71,7 +86,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("refinery-efficiency"),
     name: "精製効率向上",
     description:
-      "精製工場によって高まる付加価値が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加する。",
+      "精製工場によって高まる付加価値が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。",
     baseCost: 200,
     repeatable: true,
     prerequisites: [],
@@ -80,7 +95,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("construction-efficiency"),
     name: "建築速度向上",
     description:
-      "施設の建造・破壊にかかる時間が 10% 短縮される。繰り返し研究可能だがコストは毎回 50% 増加する。",
+      "施設の建造・破壊にかかる時間が 10% 短縮される。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。",
     baseCost: 300,
     repeatable: true,
     prerequisites: [],
@@ -100,7 +115,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("regen-efficiency"),
     name: "再生効率向上",
     description:
-      "農産資源の再生速度が 20% 向上する。繰り返し研究可能だがコストは毎回 50% 増加する。再生栽培の研究完了が前提。",
+      "農産資源の再生速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。再生栽培の研究完了が前提。",
     baseCost: 200,
     repeatable: true,
     prerequisites: [r("sustainable-farming")],
@@ -120,7 +135,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("alternativity-efficiency"),
     name: "鉱物活用率向上",
     description:
-      "建築に必要な資源の減少率が20%向上する。繰り返し研究可能だがコストは毎回 50% 増加する。鉱物活用建築の研究完了が前提。",
+      "建築に必要な資源の減少率が20%向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。鉱物活用建築の研究完了が前提。",
     baseCost: 200,
     repeatable: true,
     prerequisites: [r("alternative-building")],

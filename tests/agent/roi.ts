@@ -14,6 +14,7 @@ import {
 import type { FacilityCatalogEntry } from '../../src/domain/facility-catalog';
 import type { ResearchCatalogEntry } from '../../src/domain/research-catalog';
 import { RESEARCH_CATALOG } from '../../src/domain/research-catalog';
+import { isResearchAvailable as domainIsResearchAvailable } from '../../src/domain/research-unlock';
 import type { Extractor, Game, PlotIndex, ResearchId, ResourceType } from '../../src/domain/types';
 
 const r = (s: string) => s as ResearchId;
@@ -164,12 +165,8 @@ const SKIP_RESEARCH_KEYS = new Set([
 
 export function isResearchAvailable(entry: ResearchCatalogEntry, game: Game): boolean {
   if (SKIP_RESEARCH_KEYS.has(entry.key as string)) return false;
-  if (!entry.repeatable && (game.player.completedResearch.get(entry.key) ?? 0) > 0) return false;
   if (game.player.activeResearchIds.has(entry.key)) return false;
-  for (const prereq of entry.prerequisites) {
-    if ((game.player.completedResearch.get(prereq) ?? 0) === 0) return false;
-  }
-  return true;
+  return domainIsResearchAvailable(entry, game.player.completedResearch, game.player.funds, game.facilities);
 }
 
 /**

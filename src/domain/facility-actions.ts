@@ -1,7 +1,8 @@
 import type { FacilityCatalogEntry } from './facility-catalog';
-import { FACILITY_CATALOG } from './facility-catalog';
+import { FACILITY_CATALOG, getActualBuildCost } from './facility-catalog';
 import { newFacilityId } from './id';
-import { RESEARCH_CATALOG, type ResearchCatalogEntry } from './research-catalog';
+import { RESEARCH_CATALOG, getResearchCost, type ResearchCatalogEntry } from './research-catalog';
+export { getResearchCost } from './research-catalog';
 import type { Extractor, Facility, FacilityId, Game, GameLogEntry, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
 
 export const BUILD_DURATION_MS = 20_000;
@@ -24,18 +25,6 @@ export const EXTRACTION_RESEARCH_KEYS: Record<ResourceType, ResearchId> = {
 const REFINERY_EFFICIENCY_KEY   = r('refinery-efficiency');
 const CONSTRUCTION_EFFICIENCY_KEY = r('construction-efficiency');
 
-/**
- * 繰り返し研究の現在コストを返す（baseCost × 1.5^currentLevel）。
- * 非繰り返し研究はそのまま baseCost を返す。
- */
-export function getResearchCost(
-  entry: ResearchCatalogEntry,
-  completedResearch: Map<ResearchId, number>,
-): number {
-  if (!entry.repeatable) return entry.baseCost;
-  const currentLevel = completedResearch.get(entry.key) ?? 0;
-  return Math.round(entry.baseCost * Math.pow(1.5, currentLevel));
-}
 
 /** 指定 Laboratory で研究を開始する（state: processing） */
 export function startResearch(
@@ -231,7 +220,7 @@ export function buildFacility(
     i === plotIndex ? { ...p, facilityId } : p,
   );
   const discountRate = getMineralBuildDiscountRate(plotIndex, game.plots, game.player.completedResearch);
-  const actualCost = Math.round(entry.buildCost * (1 - discountRate));
+  const actualCost = getActualBuildCost(entry, discountRate);
   const newPlayer = {
     ...game.player,
     funds: game.player.funds - actualCost,

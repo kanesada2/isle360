@@ -33,7 +33,7 @@ import {
 import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
 import { createGame } from '@/domain/game';
 import type { ResearchCatalogEntry } from '@/domain/research-catalog';
-import { getAvailableFacilityKeys, getUnlockedPhases } from '@/domain/research-unlock';
+import { getUnlockedPhases } from '@/domain/research-unlock';
 import type { TutorialStage } from '@/domain/tutorial';
 import { createTutorialGame } from '@/domain/tutorial';
 import type { Game, GameLogEntry, PlotIndex, ResearchId, ResourcePhase } from '@/domain/types';
@@ -227,21 +227,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
     [game.player.completedResearch],
   );
 
-  const availableFacilityKeys = useMemo(
-    () => getAvailableFacilityKeys(game.player.completedResearch),
-    [game.player.completedResearch],
-  );
 
-  const activeResearchProgress = useMemo(() => {
-    const map = new Map<ResearchId, number>();
-    for (const f of game.facilities.values()) {
-      if (f.kind === 'laboratory' && f.state === 'processing' && f.activeResearchId && f.currentJob) {
-        const progress = Math.min(1, (now - f.currentJob.startedAt) / f.currentJob.durationMs);
-        map.set(f.activeResearchId, Math.max(map.get(f.activeResearchId) ?? 0, progress));
-      }
-    }
-    return map;
-  }, [game.facilities, now]);
 
   const { phaseTotals, phaseCurrents, phaseUnlocked } = useMemo(() => {
     const totals: Record<ResourcePhase, number> = { 1: 0, 2: 0, 3: 0 };
@@ -505,12 +491,8 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
         visible={buildModalVisible}
         onClose={() => setBuildModalVisible(false)}
         onBuild={isReplay ? () => {} : handleBuild}
-        availableFacilityKeys={availableFacilityKeys}
-        blockedFacilityKeys={
-          [...game.facilities.values()].some(f => f.kind === 'monument' && f.state === 'constructing')
-            ? new Set(['monument'])
-            : undefined
-        }
+        completedResearch={game.player.completedResearch}
+        facilities={game.facilities}
         funds={game.player.funds}
         discountRate={getMineralBuildDiscountRate(selectedPlotIndex, game.plots, game.player.completedResearch)}
         actionDisabled={isReplay}
@@ -545,7 +527,8 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
           handleDemolish();
         }}
         labProcessing={currentFacility?.state === 'processing'}
-        activeResearchProgress={activeResearchProgress}
+        facilities={game.facilities}
+        now={now}
         actionDisabled={isReplay}
         demolishDisabled={isReplay}
       />
