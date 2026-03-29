@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -13,18 +13,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { runAgent } from '@/agent';
+import { SoundSettingsModal } from '@/components/sound-settings-modal';
 import { Colors, Spacing } from '@/constants/theme';
 import { startGame } from '@/domain/facility-actions';
 import { createGame } from '@/domain/game';
 import { decodeLogs, encodeLogs } from '@/domain/log-codec';
+import { useSoundContext } from '@/sound';
 
 export default function TopScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
+  const { playBgm } = useSoundContext();
+  useFocusEffect(useCallback(() => { playBgm('main'); }, [playBgm]));
+
   const [replayModalVisible, setReplayModalVisible] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
   function handleDemo() {
     const game = runAgent(startGame(createGame({ sessionDurationMs: 360_000, initialFunds: 1_000 }), 0));
@@ -100,8 +106,26 @@ export default function TopScreen() {
           >
             <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Replay</Text>
           </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                borderColor: colors.text,
+                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
+              },
+            ]}
+            onPress={() => setSettingsModalVisible(true)}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Options</Text>
+          </Pressable>
         </View>
       </View>
+
+      <SoundSettingsModal
+        visible={settingsModalVisible}
+        onClose={() => setSettingsModalVisible(false)}
+      />
 
       {/* トークン入力モーダル */}
       <Modal

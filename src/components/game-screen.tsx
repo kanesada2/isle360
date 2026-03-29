@@ -13,11 +13,13 @@ import { MissionCompleteModal } from '@/components/mission-complete-modal';
 import { PhaseResourceBar } from '@/components/phase-resource-bar';
 import { ResearchModal } from '@/components/research-modal';
 import { ResultModal } from '@/components/result-modal';
+import { SoundSettingsModal } from '@/components/sound-settings-modal';
 import { StartOverlay } from '@/components/start-overlay';
 import { TimerBar } from '@/components/timer-bar';
 import { TutorialCompleteModal } from '@/components/tutorial-complete-modal';
 import { TutorialHintModal } from '@/components/tutorial-hint-modal';
 import { Colors, Spacing } from '@/constants/theme';
+import { useSoundContext } from '@/sound';
 import {
   applyReplayEvent,
   buildFacility,
@@ -78,6 +80,8 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
 
   const gameStarted = game.status !== 'setup';
   const gameFinished = game.status === 'finished';
+
+  const { playEffect, playBgm, stopBgm } = useSoundContext();
 
   // ── 再生速度（リプレイのみ）────────────────────────────────────
   const [speedMultiplier, setSpeedMultiplier] = useState<0.5 | 1 | 2 | 3>(1);
@@ -184,6 +188,8 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
 
   useEffect(() => {
     if (!gameFinished) return;
+    playEffect('game_end');
+    stopBgm();
     setBuildModalVisible(false);
     setFacilityDetailVisible(false);
     setLabModalVisible(false);
@@ -191,6 +197,25 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
       setResultVisible(true);
     }
   }, [gameFinished]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 施設の状態変化（完了イベント）を検知して SE を鳴らす
+  const prevFacilitiesRef = useRef(game.facilities);
+  useEffect(() => {
+    const prev = prevFacilitiesRef.current;
+    const curr = game.facilities;
+    for (const [id, f] of curr) {
+      const prevF = prev.get(id);
+      if (prevF?.state === 'constructing' && f.state === 'idle') {
+        playEffect(f.kind === 'monument' ? 'monument_complete' : 'build_complete');
+      } else if (prevF?.state === 'processing' && f.state === 'idle') {
+        playEffect('research_complete');
+      }
+    }
+    for (const id of prev.keys()) {
+      if (!curr.has(id)) playEffect('demolish_complete');
+    }
+    prevFacilitiesRef.current = curr;
+  }, [game.facilities, playEffect]);
 
   // チュートリアル完了モーダルは、最後のミッション達成メッセージを閉じてから表示する
   useEffect(() => {
@@ -268,9 +293,10 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
         if (next !== current) {
           currentIndexSv.value = next;
           runOnJS(navigateTo)(next);
+          runOnJS(playEffect)('swipe');
         }
       }),
-    [currentIndexSv, navigateTo],
+    [currentIndexSv, navigateTo, playEffect],
   );
 
   const handleStart = useCallback(() => {
@@ -281,7 +307,9 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
     replayEventIndexRef.current = 0;
     setGame((g) => startGame(g, t));
     setNow(t);
-  }, []);
+    playEffect('game_start');
+    playBgm('game');
+  }, [playEffect, playBgm]);
 
   const handleDismissStartHint = useCallback(() => {
     if (tutorialStage) {
@@ -298,6 +326,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
   const [buildModalVisible, setBuildModalVisible] = useState(false);
   const [facilityDetailVisible, setFacilityDetailVisible] = useState(false);
   const [labModalVisible, setLabModalVisible] = useState(false);
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
   const currentFacility = useMemo(() => {
     const facilityId = game.plots[selectedPlotIndex].facilityId;
@@ -353,11 +382,13 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
 
   const handleBuild = useCallback((entry: FacilityCatalogEntry) => {
     setGame((g) => buildFacility(g, selectedPlotIndex, entry, Date.now()));
-  }, [selectedPlotIndex]);
+    playEffect('build_start');
+  }, [selectedPlotIndex, playEffect]);
 
   const handleDemolish = useCallback(() => {
     setGame((g) => demolishFacility(g, selectedPlotIndex, Date.now()));
-  }, [selectedPlotIndex]);
+    playEffect('demolish_start');
+  }, [selectedPlotIndex, playEffect]);
 
   const cycleSpeed = useCallback(() => {
     setSpeedMultiplier((s) => {
@@ -375,6 +406,12 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
   const hintButtonTapGesture = useMemo(
     () => Gesture.Tap().onEnd(() => { 'worklet'; runOnJS(showLastHint)(); }),
     [showLastHint],
+  );
+
+  const showSettings = useCallback(() => { setTimeout(() => setSettingsModalVisible(true), 0); }, []);
+  const gearTapGesture = useMemo(
+    () => Gesture.Tap().onEnd(() => { 'worklet'; runOnJS(showSettings)(); }),
+    [showSettings],
   );
 
   return (
@@ -416,6 +453,13 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
               </View>
             </GestureDetector>
           )}
+
+          {/* 設定ボタン */}
+          <GestureDetector gesture={gearTapGesture}>
+            <View style={[styles.gearButton, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+              <Text style={styles.gearButtonText}>⚙</Text>
+            </View>
+          </GestureDetector>
 
           {/* 3×3 ミニマップ */}
           <View style={styles.miniMap}>
@@ -521,6 +565,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
           const facilityId = game.plots[selectedPlotIndex].facilityId;
           if (!facilityId) return;
           setGame((g) => startResearch(g, facilityId, entry, Date.now()));
+          playEffect('research_start');
         }}
         onDemolish={() => {
           setLabModalVisible(false);
@@ -572,6 +617,13 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
           logs={game.logs}
         />
       )}
+      {/* 設定モーダル */}
+      <SoundSettingsModal
+        visible={settingsModalVisible}
+        onClose={() => setSettingsModalVisible(false)}
+        onQuit={() => { setSettingsModalVisible(false); handleRestart(); }}
+      />
+
     </SafeAreaView>
   );
 }
@@ -624,6 +676,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 24,
     fontWeight: '700',
+  },
+  gearButton: {
+    position: 'absolute',
+    top: Spacing.two,
+    left: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gearButtonText: {
+    color: '#ffffff',
+    fontSize: 22,
   },
   miniMap: {
     flexDirection: 'row',
