@@ -35,7 +35,7 @@ export function effectiveDemolishMs(game: Game): number {
 
 export function currentRefineryMult(game: Game): number {
   const effLevel = 1//一番資金効率がいいレベルで計算しておく game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
-  const singleMult = Math.pow(1.2, 1 + effLevel);
+  const singleMult = Math.pow(1.1, 1 + effLevel);
   const count = [...game.facilities.values()].filter(
     f => f.kind === 'refinery' && f.state === 'idle',
   ).length;
@@ -45,7 +45,7 @@ export function currentRefineryMult(game: Game): number {
 /** Refinery を1基追加した場合の乗数 */
 export function refineryMultForNew(game: Game): number {
   const effLevel = 1//一番資金効率がいいレベルで計算しておく game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
-  const singleMult = Math.pow(1.2, 1 + effLevel);
+  const singleMult = Math.pow(1.1, 1 + effLevel);
   return currentRefineryMult(game) * singleMult;
 }
 
@@ -283,13 +283,16 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
     const effLevel = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[resourceType]) ?? 0;
     const rateNow  = Math.pow(1.2, effLevel) * 5;   // units/sec（現在）
     const rateNew  = rateNow * 1.2;                  // units/sec（研究後）
+    // sustainable-farming 研究済みの場合、農産資源は再生するため枯渇上限を無視する
+    const sfResearched = resourceType === 'agriculture' &&
+      (game.player.completedResearch.get(r('sustainable-farming')) ?? 0) > 0;
     let gain = 0;
     for (const f of game.facilities.values()) {
       if (f.kind !== 'extractor' || (f as Extractor).resourceType !== resourceType || f.state !== 'idle') continue;
       const deposit = game.plots[(f as Extractor).plotIndex].deposits.find(d => d.type === resourceType);
       if (!deposit || deposit.current <= 0) continue;
-      const totalNow = Math.min(rateNow * operatingSec, deposit.current);
-      const totalNew = Math.min(rateNew * operatingSec, deposit.current);
+      const totalNow = sfResearched ? rateNow * operatingSec : Math.min(rateNow * operatingSec, deposit.current);
+      const totalNew = sfResearched ? rateNew * operatingSec : Math.min(rateNew * operatingSec, deposit.current);
       gain += (totalNew - totalNow) * deposit.gain * refineMult;
     }
     return gain;
@@ -301,7 +304,7 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
     ).length;
     const curMult  = currentRefineryMult(game);
     // 研究後: 各 Refinery の singleMult が ×1.2 になるため積が 1.2^count 倍になる
-    const newMult  = curMult * Math.pow(1.2, refineryCount);
+    const newMult  = curMult * Math.pow(1.1, refineryCount);
     if (newMult <= curMult) return 0;
 
     // 精製効率は採掘速度を変えない → 将来採掘量は同じ、単価差だけが増加分
@@ -313,7 +316,7 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
       if (!deposit || deposit.current <= 0) continue;
       const effKey    = EXTRACTION_RESEARCH_KEYS[extractor.resourceType];
       const level     = game.player.completedResearch.get(effKey) ?? 0;
-      const ratePerSec = Math.pow(1.2, level) * 5;
+      const ratePerSec = Math.pow(1.1, level) * 5;
       const futureMined = Math.min(ratePerSec * operatingSec, deposit.current);
       gain += futureMined * deposit.gain * (newMult - curMult);
     }

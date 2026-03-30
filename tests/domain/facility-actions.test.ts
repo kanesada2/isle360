@@ -209,7 +209,7 @@ describe("Refinery 精製倍率", () => {
     expect(game.player.funds).toBe(fundsAfterBuild + 6);
   });
 
-  it("refinery-efficiency Lv1 で精製倍率が 1.2 × 1.2 = 1.44 になる", () => {
+  it("refinery-efficiency Lv1 で精製倍率が 1.2 × 1.1 = 1.32 になる", () => {
     let game = makeGame(2000, research(["refinery-efficiency", 1]));
     game = buildFacility(game, 0, AGRI_ENTRY,    NOW);
     game = buildFacility(game, 1, REFINERY_ENTRY, NOW);
@@ -218,8 +218,8 @@ describe("Refinery 精製倍率", () => {
 
     game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200 * 5);
 
-    // 5 × phase1 × (1.2 × 1.2^1) = 7.2
-    expect(game.player.funds).toBe(fundsAfterBuild + 7.2);
+    // 5 × phase1 × (1.2 × 1.1^1) = 7.2
+    expect(game.player.funds).toBe(fundsAfterBuild + 6.6);
   });
 
   it("精製工場2基の倍率は加算ではなく乗算される（1.2 × 1.2 = 1.44）", () => {

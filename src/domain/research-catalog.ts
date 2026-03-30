@@ -86,8 +86,8 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("refinery-efficiency"),
     name: "精製効率向上",
     description:
-      "精製工場によって高まる付加価値が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。",
-    baseCost: 200,
+      "精製工場によって高まる付加価値が 10% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。",
+    baseCost: 100,
     repeatable: true,
     prerequisites: [],
   },

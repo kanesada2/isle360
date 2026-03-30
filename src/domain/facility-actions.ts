@@ -114,7 +114,7 @@ export function getMineralBuildDiscountRate(
 
 function getRefineryResearchMultiplier(completedResearch: Map<ResearchId, number>): number {
   const level = completedResearch.get(REFINERY_EFFICIENCY_KEY) ?? 0;
-  return Math.pow(1.2, level);
+  return Math.pow(1.1, level);
 }
 
 /**
