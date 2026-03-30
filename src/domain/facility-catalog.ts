@@ -81,8 +81,8 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     name: "精製工場",
     description:
       "採集された資源に付加価値を加えて売却価格を高める施設。",
-    buildCost: 500,
-    demolishCost: 120,
+    buildCost: 300,
+    demolishCost: 70,
   },
   {
     key: "laboratory",
