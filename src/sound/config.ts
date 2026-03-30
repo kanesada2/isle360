@@ -33,7 +33,7 @@ export const SOUND_CONFIG: SoundConfig = {
     swipe:             require('../../assets/sounds/swipe.mp3'),
   },
   bgm: {
-    main: require('../../assets/sounds/bgm_main.wav'),
-    game: require('../../assets/sounds/bgm_game.wav'),
+    main: require('../../assets/sounds/bgm_main.mp3'),
+    game: require('../../assets/sounds/bgm_game.mp3'),
   },
 };
