@@ -163,7 +163,7 @@ export const TUTORIAL_CATALOG: readonly TutorialCatalogEntry[] = [
   {
     id: 'stage-4',
     title: 'エネルギー資源を採集しよう',
-    description: '鉱物調査を研究し、鉱物資源のあるマスを探してそこに鉱山を建設しよう。',
+    description: '研究を進め、エネルギー資源のあるマスを探してそこにエネルギー生産場を建設しよう。',
     stage: {
       id: 'stage-3',
       plotSetups: [
