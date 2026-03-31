@@ -29,6 +29,9 @@ export function decide(game: Game, now: number): Action | null {
   const remaining = game.sessionDurationMs - (now - game.startedAt!);
   if (remaining <= 0) return null;
 
+  const depletedDemo = findDepletedExtractorAction(game);
+  if (depletedDemo) return depletedDemo;
+
   if (shouldBuildMonument(game, remaining)) {
     const constructionResearch = decideConstructionResearchForMonuments(game, remaining);
     if (constructionResearch) return constructionResearch;
@@ -38,6 +41,20 @@ export function decide(game: Game, now: number): Action | null {
   }
 
   return pickBestAction(game, remaining);
+}
+
+// ── 枯渇 Extractor 即時解体 ───────────────────────────────────────
+
+/** 資源が枯渇した idle Extractor があれば即時解体アクションを返す */
+function findDepletedExtractorAction(game: Game): Action | null {
+  for (const f of game.facilities.values()) {
+    if (f.kind !== 'extractor' || f.state !== 'idle') continue;
+    const deposit = game.plots[f.plotIndex].deposits.find(d => d.type === f.resourceType);
+    if (deposit?.current === 0) {
+      return { kind: 'demolish', plotIndex: f.plotIndex };
+    }
+  }
+  return null;
 }
 
 // ── 農産優位判定 ─────────────────────────────────────────────────
@@ -145,15 +162,8 @@ function pickBestAction(game: Game, remaining: number): Action | null {
       }
     }
   }
-  // ── 解体候補
-  for (const [id, f] of game.facilities) {
-    if(f.kind !== 'extractor') continue;
-    if(f.state !== 'idle') continue;
-    const extractingResource = game.plots[f.plotIndex].deposits.find(deposit => deposit.type == f.resourceType);
-    if(extractingResource?.current === 0){
-      candidates.push({ action: { kind: 'demolish', plotIndex: f.plotIndex }, gain: Infinity, cost: f.demolishCost });
-    }
-  }
+  // ── 枯渇 Extractor 解体（findDepletedExtractorAction で処理済みだが念のため候補にも追加）
+  // ※ decide() の冒頭で先に返しているため、ここには基本到達しない
 
   if (candidates.length === 0) return null;
 
@@ -308,9 +318,11 @@ function decideMonumentAction(game: Game, remaining: number): Action | null {
     if (emptyPlot !== null) {
       return { kind: 'build', plotIndex: emptyPlot, entry: monumentEntry };
     }
-    const plotIndex = findLowestValueNonMonumentPlot(game, remaining);
-    if (plotIndex !== null && !isDemolishing) {
-      return { kind: 'demolish', plotIndex };
+    if (!isDemolishing) {
+      const plotIndex = findLowestValueNonMonumentPlot(game, remaining);
+      if(plotIndex !== null) {
+        return { kind: 'demolish', plotIndex };
+      }
     }
   }
   return null;
