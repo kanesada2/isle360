@@ -326,9 +326,14 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
   return 0;
 }
 
-/** 効率系研究に対応する施設が一基でも存在するか（建設中・idle 問わず）
- * extractorは二基でいく
-*/
+/**
+ * 効率系研究のブロック解除判定。
+ * 採掘系（agri/mineral/energy-efficiency）:
+ *   対応資源の abundance がそのプロット内で最大（同率含む）となる全プロットに
+ *   何らかの建築物が建っている場合のみ true。
+ * refinery-efficiency: Refinery が1基以上存在すれば true。
+ * その他: 常に true。
+ */
 function hasFacilityForEfficiency(game: Game, entry: ResearchCatalogEntry): boolean {
   const resourceTypeMap: Record<string, ResourceType> = {
     'agri-efficiency':    'agriculture',
@@ -337,9 +342,13 @@ function hasFacilityForEfficiency(game: Game, entry: ResearchCatalogEntry): bool
   };
   const resourceType = resourceTypeMap[entry.key as string];
   if (resourceType) {
-    return [...game.facilities.values()].filter(
-      f => f.kind === 'extractor' && (f as Extractor).resourceType === resourceType,
-    ).length >= 2;
+    const dominantPlots = game.plots.filter(plot => {
+      const maxAbundance = Math.max(...plot.deposits.map(d => d.abundance));
+      if (maxAbundance <= 0) return false;
+      const targetAbundance = plot.deposits.find(d => d.type === resourceType)?.abundance ?? 0;
+      return targetAbundance >= maxAbundance && targetAbundance > 500;
+    });
+    return dominantPlots.every(plot => plot.facilityId !== null);
   }
   if ((entry.key as string) === 'refinery-efficiency') {
     return [...game.facilities.values()].some(f => f.kind === 'refinery');

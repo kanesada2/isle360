@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { type AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import type { BgmKey, SeKey, SoundConfig } from './types';
@@ -31,13 +31,13 @@ interface Props {
 export function SoundProvider({ config, children }: Props) {
   const [seEnabled, setSeEnabled] = useState(config?.initialSeEnabled ?? true);
   const [bgmEnabled, setBgmEnabled] = useState(config?.initialBgmEnabled ?? true);
-  const bgmRef = useRef<Audio.Sound | null>(null);
+  const bgmRef = useRef<AudioPlayer | null>(null);
   const bgmKeyRef = useRef<BgmKey | null>(null);
 
   useEffect(() => {
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: false,
-      staysActiveInBackground: false,
+    setAudioModeAsync({
+      playsInSilentMode: false,
+      shouldPlayInBackground: false,
     }).catch(() => {});
   }, []);
 
@@ -45,9 +45,9 @@ export function SoundProvider({ config, children }: Props) {
   useEffect(() => {
     if (!bgmRef.current) return;
     if (bgmEnabled) {
-      bgmRef.current.playAsync().catch(() => {});
+      bgmRef.current.play();
     } else {
-      bgmRef.current.pauseAsync().catch(() => {});
+      bgmRef.current.pause();
     }
   }, [bgmEnabled]);
 
@@ -55,16 +55,13 @@ export function SoundProvider({ config, children }: Props) {
     (key: SeKey) => {
       if (!seEnabled || !config?.se?.[key]) return;
       const source = config.se[key]!;
-      Audio.Sound.createAsync(source)
-        .then(({ sound }) => {
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              sound.unloadAsync().catch(() => {});
-            }
-          });
-          return sound.playAsync();
-        })
-        .catch(() => {});
+      const player = createAudioPlayer(source);
+      player.addListener('playbackStatusUpdate', (status) => {
+        if (status.didJustFinish) {
+          player.remove();
+        }
+      });
+      player.play();
     },
     [seEnabled, config],
   );
@@ -74,7 +71,7 @@ export function SoundProvider({ config, children }: Props) {
       if (!config?.bgm?.[key]) return;
       if (bgmKeyRef.current === key && bgmRef.current) return;
 
-      bgmRef.current?.unloadAsync().catch(() => {});
+      bgmRef.current?.remove();
       bgmRef.current = null;
       bgmKeyRef.current = key;
 
@@ -82,24 +79,24 @@ export function SoundProvider({ config, children }: Props) {
 
       const source = config.bgm[key]!;
       const volume = config.bgmVolume ?? 0.5;
-      Audio.Sound.createAsync(source, { isLooping: true, shouldPlay: true, volume })
-        .then(({ sound }) => {
-          bgmRef.current = sound;
-        })
-        .catch(() => {});
+      const player = createAudioPlayer(source);
+      player.loop = true;
+      player.volume = volume;
+      player.play();
+      bgmRef.current = player;
     },
     [bgmEnabled, config],
   );
 
   const stopBgm = useCallback(() => {
-    bgmRef.current?.unloadAsync().catch(() => {});
+    bgmRef.current?.remove();
     bgmRef.current = null;
     bgmKeyRef.current = null;
   }, []);
 
   useEffect(() => {
     return () => {
-      bgmRef.current?.unloadAsync().catch(() => {});
+      bgmRef.current?.remove();
     };
   }, []);
 
