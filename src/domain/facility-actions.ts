@@ -25,6 +25,17 @@ export const EXTRACTION_RESEARCH_KEYS: Record<ResourceType, ResearchId> = {
 const REFINERY_EFFICIENCY_KEY   = r('refinery-efficiency');
 const CONSTRUCTION_EFFICIENCY_KEY = r('construction-efficiency');
 
+const PATENT_KEYS: ResearchId[] = [
+  r('agri-patent'), r('mineral-patent'), r('energy-patent'),
+  r('refinery-patent'), r('construction-patent'), r('regen-patent'), r('alternativity-patent'),
+];
+export const PATENT_FUNDS_PER_SEC = 10;
+
+/** 完了済み特許の数を返す */
+function countCompletedPatents(completedResearch: Map<ResearchId, number>): number {
+  return PATENT_KEYS.filter((k) => (completedResearch.get(k) ?? 0) > 0).length;
+}
+
 
 /** 指定 Laboratory で研究を開始する（state: processing） */
 export function startResearch(
@@ -438,6 +449,27 @@ export function tickFacilities(game: Game, now: number): Game {
     });
   }
 
+  // ── 特許収入：完了済み特許1件につき10G/秒 ────────────────────────
+  const patentCount = countCompletedPatents(newPlayer.completedResearch);
+  if (patentCount > 0) {
+    if (newPlayer.patentTickAt === null) {
+      // 初回：タイマー初期化のみ
+      newPlayer = { ...newPlayer, patentTickAt: now };
+      changed = true;
+    } else {
+      const deltaSec = (now - newPlayer.patentTickAt) / 1000;
+      if (deltaSec > 0) {
+        const patentIncome = patentCount * PATENT_FUNDS_PER_SEC * deltaSec;
+        newPlayer = {
+          ...newPlayer,
+          funds: Math.round((newPlayer.funds + patentIncome) * 100) / 100,
+          patentTickAt: now,
+        };
+        changed = true;
+      }
+    }
+  }
+
   if (!changed) return game;
 
   const nextGame = { ...game, player: { ...newPlayer, activeResearchIds: newActiveResearchIds }, facilities: newFacilities, plots: newPlots };
@@ -529,6 +561,7 @@ export function computeFundsPerSecond(game: Game): number {
     );
     total += unitsPerSec * deposit.gain * refineryMult;
   }
+  total += countCompletedPatents(game.player.completedResearch) * PATENT_FUNDS_PER_SEC;
   return Math.round(total * 100) / 100;
 }
 

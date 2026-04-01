@@ -30,10 +30,22 @@ describe('getAvailableResearch', () => {
     expect(keys).not.toContain('agri-efficiency');
   });
 
-  it('非繰り返し研究は未完了なら含まれる', () => {
-    const completed = makeCompleted([]);
+  it('非繰り返し研究は前提完了済みなら含まれる', () => {
+    const completed = makeCompleted([['agri-efficiency', 1]]);
     const keys = getAvailableResearch(completed).map((e) => e.key);
     expect(keys).toContain('mineral-survey');
+  });
+
+  it('hideUntilAvailable な研究は前提未完了なら含まれない', () => {
+    const completed = makeCompleted([]);
+    const keys = getAvailableResearch(completed).map((e) => e.key);
+    expect(keys).not.toContain('agri-patent');
+  });
+
+  it('hideUntilAvailable な研究は前提完了後に含まれる', () => {
+    const completed = makeCompleted([['agri-efficiency', 5]]);
+    const keys = getAvailableResearch(completed).map((e) => e.key);
+    expect(keys).toContain('agri-patent');
   });
 
   it('非繰り返し研究は完了後リストから消える', () => {
@@ -47,14 +59,14 @@ describe('isResearchAvailable', () => {
   it('前提研究未完了なら false', () => {
     const entry = getAvailableResearch(new Map()).find((e) => e.key === 'agri-efficiency')!;
     // mineral-survey の前提は agri-efficiency
-    const mineralSurveyEntry = { key: r('mineral-survey'), name: '', description: '', baseCost: 200, repeatable: false, prerequisites: [r('agri-efficiency')] };
+    const mineralSurveyEntry = { key: r('mineral-survey'), name: '', description: '', baseCost: 200, repeatable: false, prerequisites: [{ key: r('agri-efficiency'), level: 1 }] };
     const result = isResearchAvailable(mineralSurveyEntry, new Map(), highFunds, noFacilities);
     expect(result).toBe(false);
   });
 
   it('前提研究完了済みなら true', () => {
     const completed = makeCompleted([['agri-efficiency', 1]]);
-    const mineralSurveyEntry = { key: r('mineral-survey'), name: '', description: '', baseCost: 200, repeatable: false, prerequisites: [r('agri-efficiency')] };
+    const mineralSurveyEntry = { key: r('mineral-survey'), name: '', description: '', baseCost: 200, repeatable: false, prerequisites: [{ key: r('agri-efficiency'), level: 1 }] };
     const result = isResearchAvailable(mineralSurveyEntry, completed, highFunds, noFacilities);
     expect(result).toBe(true);
   });

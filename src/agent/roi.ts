@@ -6,6 +6,7 @@ import {
   BUILD_DURATION_MS,
   DEMOLISH_DURATION_MS,
   EXTRACTION_RESEARCH_KEYS,
+  PATENT_FUNDS_PER_SEC,
   RESEARCH_DURATION_MS,
   getAgriRegenRatePerSec,
   getMineralBuildDiscountRate,
@@ -250,10 +251,10 @@ export function researchScoreGain(
     // 一度完了した非繰り返し研究は二重カウントしない
     if (!other.repeatable && (newCompleted.get(other.key) ?? 0) > 0) continue;
     // この研究を完了する「前」は利用不可だったか
-    const wasAvailable = other.prerequisites.every((p: ResearchId) => (completed.get(p) ?? 0) > 0);
+    const wasAvailable = other.prerequisites.every((p) => (completed.get(p.key) ?? 0) >= p.level);
     if (wasAvailable) continue;
     // この研究を完了した「後」は利用可能になるか
-    const isNowAvailable = other.prerequisites.every((p: ResearchId) => (newCompleted.get(p) ?? 0) > 0);
+    const isNowAvailable = other.prerequisites.every((p) => (newCompleted.get(p.key) ?? 0) >= p.level);
     if (!isNowAvailable) continue;
 
     const otherGain = researchScoreGain(game, other, remainingAfter, newCompleted);
@@ -275,6 +276,7 @@ export function researchROI(
 ): number {
   const cost = getResearchCost(entry, game.player.completedResearch);
   const scoreGain = researchScoreGain(game, entry, remainingMs);
+  if (cost === 0) return scoreGain > 0 ? Infinity : 0;
   return scoreGain / cost;
 }
 
@@ -363,6 +365,15 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
       gain += futureMined * deposit.gain * (newMult - curMult);
     }
     return gain;
+  }
+
+  // 特許系研究: baseCost=0、残り時間分のパッシブ収入をそのまま返す
+  const PATENT_KEYS = new Set([
+    'agri-patent', 'mineral-patent', 'energy-patent',
+    'refinery-patent', 'construction-patent', 'regen-patent', 'alternativity-patent',
+  ]);
+  if (PATENT_KEYS.has(entry.key as string)) {
+    return PATENT_FUNDS_PER_SEC * (remainingAfterMs / 1000);
   }
 
   return 0;

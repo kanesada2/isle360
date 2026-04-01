@@ -160,6 +160,7 @@ export function createTutorialGame(stage: TutorialStage): Game {
       (stage.initialResearch ?? []).map(({ researchKey, level }) => [researchKey, level]),
     ),
     activeResearchIds: new Set(),
+    patentTickAt: null,
   };
 
   // 全9マスを構築（指定なしは埋蔵量ゼロ）

@@ -15,6 +15,7 @@ export function createGame({ sessionDurationMs, initialFunds, mapSeed: seedParam
     funds: initialFunds,
     completedResearch: new Map(),
     activeResearchIds: new Set(),
+    patentTickAt: null,
   };
 
   const mapSeed = seedParam ?? Math.floor(Math.random() * 0xFFFFFFFF);

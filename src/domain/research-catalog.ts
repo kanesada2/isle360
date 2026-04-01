@@ -7,14 +7,16 @@ export type ResearchCatalogEntry = {
   baseCost: number;
   /** true の場合、研究するたびにコストが 50% 増加 */
   repeatable: boolean;
-  /** 前提研究のキー一覧 */
-  prerequisites: ResearchId[];
+  /** 前提研究（キーと必要レベル） */
+  prerequisites: Array<{ key: ResearchId; level: number }>;
   /** この研究を完了するとアンロックされる資源フェーズ */
   unlocksPhase?: ResourcePhase;
   /** 指定した場合、デフォルトの RESEARCH_DURATION_MS の代わりにこの時間（ms）を使用する */
   researchDurationMs?: number;
   /** true の場合、特別な研究としてUIで強調表示する */
   special?: boolean;
+  /** true の場合、前提研究が満たされるまでリストに表示しない */
+  hideUntilAvailable?: boolean;
 };
 
 export const MAX_RESEARCH_LEVEL = 5;
@@ -45,13 +47,23 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     prerequisites: [],
   },
   {
+    key: r("agri-patent"),
+    name: "農産物採集技術提供",
+    description:
+      "1秒につき10の資金を得る。",
+    baseCost: 0,
+    repeatable: false,
+    prerequisites: [{ key: r("agri-efficiency"), level: 5 }],
+    hideUntilAvailable: true,
+  },
+  {
     key: r("mineral-survey"),
     name: "鉱物調査",
     description:
       "各マスの鉱物埋蔵量が可視化され、鉱山の建設が可能になる。農産物採集効率上昇の研究完了が前提。",
     baseCost: 200,
     repeatable: false,
-    prerequisites: [r("agri-efficiency")],
+    prerequisites: [{ key: r("agri-efficiency"), level: 1 }],
     unlocksPhase: 2,
   },
   {
@@ -61,7 +73,17 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
       "鉱山の採掘速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。鉱物調査の完了が前提。",
     baseCost: 200,
     repeatable: true,
-    prerequisites: [r("mineral-survey")],
+    prerequisites: [{ key: r("mineral-survey"), level: 1 }],
+  },
+  {
+    key: r("mineral-patent"),
+    name: "鉱物採掘技術提供",
+    description:
+      "1秒につき10の資金を得る。",
+    baseCost: 0,
+    repeatable: false,
+    prerequisites: [{ key: r("mineral-efficiency"), level: 5 }],
+    hideUntilAvailable: true,
   },
   {
     key: r("energy-survey"),
@@ -70,7 +92,7 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
       "各マスのエネルギー資源埋蔵量が可視化され、エネルギー生産場の建設が可能になる。鉱物採掘効率向上の研究完了が前提。",
     baseCost: 300,
     repeatable: false,
-    prerequisites: [r("mineral-efficiency")],
+    prerequisites: [{ key: r("mineral-efficiency"), level: 1 }],
     unlocksPhase: 3,
   },
   {
@@ -80,7 +102,17 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
       "エネルギー生産場の速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。エネルギー資源調査の完了が前提。",
     baseCost: 300,
     repeatable: true,
-    prerequisites: [r("energy-survey")],
+    prerequisites: [{ key: r("energy-survey"), level: 1 }],
+  },
+  {
+    key: r("energy-patent"),
+    name: "エネルギー獲得技術提供",
+    description:
+      "1秒につき10の資金を得る。",
+    baseCost: 0,
+    repeatable: false,
+    prerequisites: [{ key: r("energy-efficiency"), level: 5 }],
+    hideUntilAvailable: true,
   },
   {
     key: r("refinery-efficiency"),
@@ -92,6 +124,16 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     prerequisites: [],
   },
   {
+    key: r("refinery-patent"),
+    name: "精製技術提供",
+    description:
+      "1秒につき10の資金を得る。",
+    baseCost: 0,
+    repeatable: false,
+    prerequisites: [{ key: r("refinery-efficiency"), level: 5 }],
+    hideUntilAvailable: true,
+  },
+  {
     key: r("construction-efficiency"),
     name: "建築速度向上",
     description:
@@ -99,6 +141,16 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     baseCost: 300,
     repeatable: true,
     prerequisites: [],
+  },
+  {
+    key: r("construction-patent"),
+    name: "建築技術提供",
+    description:
+      "1秒につき10の資金を得る。",
+    baseCost: 0,
+    repeatable: false,
+    prerequisites: [{ key: r("construction-efficiency"), level: 5 }],
+    hideUntilAvailable: true,
   },
   {
     key: r("sustainable-farming"),
@@ -118,7 +170,17 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
       "農産資源の再生速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。再生栽培の研究完了が前提。",
     baseCost: 200,
     repeatable: true,
-    prerequisites: [r("sustainable-farming")],
+    prerequisites: [{ key: r("sustainable-farming"), level: 1 }],
+  },
+  {
+    key: r("regen-patent"),
+    name: "再生栽培技術提供",
+    description:
+      "1秒につき10の資金を得る。",
+    baseCost: 0,
+    repeatable: false,
+    prerequisites: [{ key: r("regen-efficiency"), level: 5 }],
+    hideUntilAvailable: true,
   },
   {
     key: r("alternative-building"),
@@ -138,6 +200,16 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
       "建築に必要な資源の減少率が20%向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。鉱物活用建築の研究完了が前提。",
     baseCost: 200,
     repeatable: true,
-    prerequisites: [r("alternative-building")],
+    prerequisites: [{ key: r("alternative-building"), level: 1 }],
+  },
+  {
+    key: r("alternativity-patent"),
+    name: "鉱物活用技術提供",
+    description:
+      "1秒につき10の資金を得る。",
+    baseCost: 0,
+    repeatable: false,
+    prerequisites: [{ key: r("alternativity-efficiency"), level: 5 }],
+    hideUntilAvailable: true,
   },
 ];

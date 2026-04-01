@@ -28,7 +28,9 @@ export function getAvailableResearch(
 ): ResearchCatalogEntry[] {
   return RESEARCH_CATALOG.filter((e) => {
     const level = completedResearch.get(e.key) ?? 0;
-    return e.repeatable ? level < MAX_RESEARCH_LEVEL : level === 0;
+    if (e.repeatable ? level >= MAX_RESEARCH_LEVEL : level > 0) return false;
+    if (e.hideUntilAvailable && !e.prerequisites.every((p) => (completedResearch.get(p.key) ?? 0) >= p.level)) return false;
+    return true;
   });
 }
 
@@ -46,7 +48,7 @@ export function isResearchAvailable(
 ): boolean {
   const level = completedResearch.get(entry.key) ?? 0;
   if (entry.repeatable ? level >= MAX_RESEARCH_LEVEL : level > 0) return false;
-  if (!entry.prerequisites.every((prereq) => (completedResearch.get(prereq) ?? 0) >= 1)) return false;
+  if (!entry.prerequisites.every((prereq) => (completedResearch.get(prereq.key) ?? 0) >= prereq.level)) return false;
   if (getResearchCost(entry, completedResearch) > funds) return false;
   if ([...facilities.values()].some((f) => f.kind === 'laboratory' && f.state === 'processing' && f.activeResearchId === entry.key)) return false;
   return true;
