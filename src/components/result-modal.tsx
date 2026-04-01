@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Pressable,
@@ -16,7 +17,7 @@ import type { ScoreBreakdown } from '@/domain/facility-actions';
 import { encodeLogs } from '@/domain/log-codec';
 import type { GameLogEntry } from '@/domain/types';
 
-type Tab = 'score' | 'graph';
+type Tab = 'score' | 'graph' | 'npc';
 
 type Props = {
   visible: boolean;
@@ -24,6 +25,8 @@ type Props = {
   onRestart: () => void;
   onClose?: () => void;
   logs: GameLogEntry[];
+  agentLogs?: GameLogEntry[];
+  agentScore?: number;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -314,9 +317,59 @@ function GraphTab({ logs, colors }: GraphTabProps) {
   );
 }
 
+// ── NPCタブ ───────────────────────────────────────────────────
+
+type NpcTabProps = {
+  agentLogs?: GameLogEntry[];
+  agentScore?: number;
+  colors: AppColors;
+  onClose?: () => void;
+};
+
+function NpcTab({ agentLogs, agentScore, colors, onClose }: NpcTabProps) {
+  const router = useRouter();
+
+  const handleView = useCallback(() => {
+    if (!agentLogs) return;
+    const token = encodeLogs(agentLogs);
+    onClose?.();
+    router.push(`/replay?token=${encodeURIComponent(token)}`);
+  }, [agentLogs, router, onClose]);
+
+  if (!agentLogs || agentScore === undefined) {
+    return (
+      <View style={styles.npcLoading}>
+        <Text style={[styles.npcLoadingText, { color: colors.textSecondary }]}>計算中...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.npcContent}>
+      <View style={[styles.scoreBox, { backgroundColor: colors.background }]}>
+        <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>NPCスコア</Text>
+        <Text style={[styles.scoreValue, { color: colors.text }]}>
+          {agentScore.toLocaleString()} pt
+        </Text>
+      </View>
+      <Pressable
+        style={({ pressed }) => [
+          styles.viewButton,
+          { backgroundColor: pressed ? colors.backgroundSelected : colors.background, borderColor: colors.backgroundSelected },
+        ]}
+        onPress={handleView}
+      >
+        <Text style={[styles.viewButtonText, { color: colors.text }]}>見る</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // ── ResultModal ───────────────────────────────────────────────
 
-export function ResultModal({ visible, breakdown, onRestart, onClose, logs }: Props) {
+const TAB_LABELS: Record<Tab, string> = { score: 'スコア', graph: 'グラフ', npc: 'NPCプレイ' };
+
+export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agentLogs, agentScore }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -332,7 +385,7 @@ export function ResultModal({ visible, breakdown, onRestart, onClose, logs }: Pr
 
           {/* タブ */}
           <View style={[styles.tabs, { borderBottomColor: colors.backgroundSelected }]}>
-            {(['score', 'graph'] as const).map((tab) => {
+            {(['score', 'graph', ...(agentLogs !== undefined ? ['npc'] : [])] as Tab[]).map((tab) => {
               const isActive = activeTab === tab;
               return (
                 <Pressable
@@ -341,7 +394,7 @@ export function ResultModal({ visible, breakdown, onRestart, onClose, logs }: Pr
                   onPress={() => setActiveTab(tab)}
                 >
                   <Text style={[styles.tabText, { color: isActive ? colors.text : colors.textSecondary }]}>
-                    {tab === 'score' ? 'スコア' : 'グラフ'}
+                    {TAB_LABELS[tab]}
                   </Text>
                 </Pressable>
               );
@@ -351,7 +404,9 @@ export function ResultModal({ visible, breakdown, onRestart, onClose, logs }: Pr
           {/* タブコンテンツ */}
           {activeTab === 'score'
             ? <ScoreTab breakdown={breakdown} logs={logs} colors={colors} />
-            : <GraphTab logs={logs} colors={colors} />
+            : activeTab === 'graph'
+              ? <GraphTab logs={logs} colors={colors} />
+              : <NpcTab agentLogs={agentLogs} agentScore={agentScore} colors={colors} onClose={onClose} />
           }
 
           <Pressable
@@ -496,6 +551,27 @@ const styles = StyleSheet.create({
   chartArea: {
     borderRadius: Spacing.one,
     overflow: 'hidden',
+  },
+  // NPCタブ
+  npcLoading: {
+    paddingVertical: Spacing.six,
+    alignItems: 'center',
+  },
+  npcLoadingText: {
+    fontSize: 14,
+  },
+  npcContent: {
+    gap: Spacing.three,
+  },
+  viewButton: {
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  viewButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   // 再スタートボタン
   restartButton: {

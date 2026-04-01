@@ -7,7 +7,7 @@ import {
   DEMOLISH_DURATION_MS,
   EXTRACTION_RESEARCH_KEYS,
   RESEARCH_DURATION_MS,
-  computeFundsPerSecond,
+  getAgriRegenRatePerSec,
   getMineralBuildDiscountRate,
   getResearchCost,
 } from '../domain/facility-actions';
@@ -34,7 +34,7 @@ export function effectiveDemolishMs(game: Game): number {
 // ── Refinery 乗数 ───────────────────────────────────────────────
 
 export function currentRefineryMult(game: Game): number {
-  const effLevel = 1//一番資金効率がいいレベルで計算しておく game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
+  const effLevel = game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
   const singleMult = Math.pow(1.1, 1 + effLevel);
   const count = [...game.facilities.values()].filter(
     f => f.kind === 'refinery' && f.state === 'idle',
@@ -44,7 +44,7 @@ export function currentRefineryMult(game: Game): number {
 
 /** Refinery を1基追加した場合の乗数 */
 export function refineryMultForNew(game: Game): number {
-  const effLevel = 1//一番資金効率がいいレベルで計算しておく game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
+  const effLevel = game.player.completedResearch.get(r('refinery-efficiency')) ?? 0;
   const singleMult = Math.pow(1.1, 1 + effLevel);
   return currentRefineryMult(game) * singleMult;
 }
@@ -116,22 +116,36 @@ function plotResourceDominance(deposits: { type: ResourceType; phase: number; ga
 export function refineryROI(
   game: Game,
   entry: FacilityCatalogEntry,
-  plotIndex: PlotIndex,
+  _plotIndex: PlotIndex,
   remainingMs: number,
 ): number {
   const operatingMs = Math.max(0, remainingMs - effectiveBuildMs(game));
-  const currentIncome = computeFundsPerSecond(game);
-  if (currentIncome <= 0) return 0;
-
   const curMult = currentRefineryMult(game);
   const newMult = refineryMultForNew(game);
-  const incomeIncrease = currentIncome * (newMult / Math.max(curMult, 1e-9) - 1);
-  const scoreGain = incomeIncrease * (operatingMs / 1000);
+  const multDiff = newMult - curMult;
+  if (multDiff <= 0) return 0;
 
-  // 機会費用: このマスに Extractor を建てていたら得られた最大収入を差し引く
-  const opportunityCost = bestExtractorIncomeForPlot(game, plotIndex, operatingMs);
+  const sfResearched = (game.player.completedResearch.get(r('sustainable-farming')) ?? 0) > 0;
 
-  return (scoreGain - opportunityCost) / entry.buildCost;
+  // Extractor ごとに実際の将来採掘量（deposit 枯渇上限込み）を計算し、
+  // 精製倍率の増加分だけが追加収益になる
+  let scoreGain = 0;
+  for (const f of game.facilities.values()) {
+    if (f.kind !== 'extractor' || f.state !== 'idle') continue;
+    const extractor = f as Extractor;
+    const deposit = game.plots[extractor.plotIndex].deposits.find(d => d.type === extractor.resourceType);
+    if (!deposit || deposit.current <= 0) continue;
+    const effLevel = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[extractor.resourceType]) ?? 0;
+    const ratePerSec = Math.pow(1.2, effLevel) * 5;
+    // sustainable-farming 研究済みの農産は再生するため枯渇上限を適用しない
+    const canRegen = sfResearched && extractor.resourceType === 'agriculture';
+    const futureMined = canRegen
+      ? ratePerSec * (operatingMs / 1000)
+      : Math.min(ratePerSec * (operatingMs / 1000), deposit.current);
+    scoreGain += futureMined * deposit.gain * multDiff;
+  }
+
+  return scoreGain / entry.buildCost;
 }
 
 /**
@@ -145,6 +159,7 @@ export function bestExtractorIncomeForPlot(game: Game, plotIndex: PlotIndex, ope
   let best = 0;
   for (const deposit of game.plots[plotIndex].deposits) {
     if (deposit.current <= 0) continue;
+    if (deposit.type !== 'agriculture' && (game.player.completedResearch.has(r('sustainable-farming')) || game.player.activeResearchIds.has(r('sustainable-farming')))) continue;
     const effLevel   = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[deposit.type]) ?? 0;
     const ratePerSec = Math.pow(1.2, effLevel) * 5;
     const income = Math.min(ratePerSec * (operatingMs / 1000), deposit.current) * deposit.gain * refineMult;
@@ -155,11 +170,9 @@ export function bestExtractorIncomeForPlot(game: Game, plotIndex: PlotIndex, ope
 
 // ── 研究 ROI ────────────────────────────────────────────────────
 
-/** 初期実装でスキップする研究（ROI計算が複雑な special 系） */
+/** ROI計算が未実装の研究（special 系など） */
 const SKIP_RESEARCH_KEYS = new Set([
-  'sustainable-farming',
   'alternative-building',
-  'regen-efficiency',
   'alternativity-efficiency',
 ]);
 
@@ -232,6 +245,8 @@ export function researchScoreGain(
   for (const other of RESEARCH_CATALOG) {
     if (SKIP_RESEARCH_KEYS.has(other.key as string)) continue;
     if (other.key === entry.key) continue;
+    // 現在別の lab で研究中のものはすでに進行中なので chain gain に含めない
+    if (game.player.activeResearchIds.has(other.key)) continue;
     // 一度完了した非繰り返し研究は二重カウントしない
     if (!other.repeatable && (newCompleted.get(other.key) ?? 0) > 0) continue;
     // この研究を完了する「前」は利用不可だったか
@@ -283,7 +298,6 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
     const effLevel = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[resourceType]) ?? 0;
     const rateNow  = Math.pow(1.2, effLevel) * 5;   // units/sec（現在）
     const rateNew  = rateNow * 1.2;                  // units/sec（研究後）
-    // sustainable-farming 研究済みの場合、農産資源は再生するため枯渇上限を無視する
     const sfResearched = resourceType === 'agriculture' &&
       (game.player.completedResearch.get(r('sustainable-farming')) ?? 0) > 0;
     let gain = 0;
@@ -291,9 +305,37 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
       if (f.kind !== 'extractor' || (f as Extractor).resourceType !== resourceType || f.state !== 'idle') continue;
       const deposit = game.plots[(f as Extractor).plotIndex].deposits.find(d => d.type === resourceType);
       if (!deposit || deposit.current <= 0) continue;
-      const totalNow = sfResearched ? rateNow * operatingSec : Math.min(rateNow * operatingSec, deposit.current);
-      const totalNew = sfResearched ? rateNew * operatingSec : Math.min(rateNew * operatingSec, deposit.current);
-      gain += (totalNew - totalNow) * deposit.gain * refineMult;
+      if (sfResearched) {
+        // sustainable-farming あり: 採掘速度と再生速度の小さい方が実効レートになる
+        const regenRate = getAgriRegenRatePerSec(deposit.abundance, game.player.completedResearch);
+        const effectiveNow = Math.min(rateNow, regenRate);
+        const effectiveNew = Math.min(rateNew, regenRate);
+        gain += (effectiveNew - effectiveNow) * operatingSec * deposit.gain * refineMult;
+      } else {
+        const totalNow = Math.min(rateNow * operatingSec, deposit.current);
+        const totalNew = Math.min(rateNew * operatingSec, deposit.current);
+        gain += (totalNew - totalNow) * deposit.gain * refineMult;
+      }
+    }
+    return gain;
+  }
+
+  if ((entry.key as string) === 'regen-efficiency') {
+    // sustainable-farming がない場合は効果なし
+    if ((game.player.completedResearch.get(r('sustainable-farming')) ?? 0) === 0) return 0;
+    let gain = 0;
+    for (const f of game.facilities.values()) {
+      if (f.kind !== 'extractor' || (f as Extractor).resourceType !== 'agriculture' || f.state !== 'idle') continue;
+      const deposit = game.plots[(f as Extractor).plotIndex].deposits.find(d => d.type === 'agriculture');
+      if (!deposit || deposit.current <= 0) continue;
+      const effLevel  = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS['agriculture']) ?? 0;
+      const miningRate = Math.pow(1.2, effLevel) * 5;
+      const regenRate  = getAgriRegenRatePerSec(deposit.abundance, game.player.completedResearch);
+      const newRegenRate = regenRate * 1.2;
+      // 採掘速度 > 再生速度の場合のみ再生速度アップが収益増につながる
+      const effectiveNow = Math.min(miningRate, regenRate);
+      const effectiveNew = Math.min(miningRate, newRegenRate);
+      gain += (effectiveNew - effectiveNow) * operatingSec * deposit.gain * refineMult;
     }
     return gain;
   }

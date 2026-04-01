@@ -34,6 +34,7 @@ import {
 } from '@/domain/facility-actions';
 import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
 import { createGame } from '@/domain/game';
+import { runAgent } from '@/agent/simulator';
 import type { ResearchCatalogEntry } from '@/domain/research-catalog';
 import { getUnlockedPhases } from '@/domain/research-unlock';
 import type { TutorialStage } from '@/domain/tutorial';
@@ -185,6 +186,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
 
   const [resultVisible, setResultVisible] = useState(false);
   const [tutorialCompleteVisible, setTutorialCompleteVisible] = useState(false);
+  const [agentResult, setAgentResult] = useState<{ logs: GameLogEntry[]; score: number } | null>(null);
 
   useEffect(() => {
     if (!gameFinished) return;
@@ -195,6 +197,17 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
     setLabModalVisible(false);
     if (!isTutorial) {
       setResultVisible(true);
+      // 同じシードでエージェントをシミュレートしてNPCスコアを計算（リプレイ時はスキップ）
+      if (!isReplay) {
+        setTimeout(() => {
+          const agentGame = startGame(
+            createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS, mapSeed: game.mapSeed }),
+            Date.now(),
+          );
+          const finalGame = runAgent(agentGame);
+          setAgentResult({ logs: finalGame.logs, score: computeScore(finalGame).total });
+        }, 0);
+      }
     }
   }, [gameFinished]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -615,6 +628,8 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
           onRestart={handleRestart}
           onClose={() => setResultVisible(false)}
           logs={game.logs}
+          agentLogs={isReplay ? undefined : agentResult?.logs}
+          agentScore={isReplay ? undefined : agentResult?.score}
         />
       )}
       {/* 設定モーダル */}

@@ -1,7 +1,7 @@
 import { computeFundsPerSecond, getMineralBuildDiscountRate, getResearchCost } from '../domain/facility-actions';
 import { FACILITY_CATALOG } from '../domain/facility-catalog';
 import { RESEARCH_CATALOG } from '../domain/research-catalog';
-import { isResearchAvailable as domainIsResearchAvailable, getAvailableFacilityKeys } from '../domain/research-unlock';
+import { getAvailableFacilityKeys } from '../domain/research-unlock';
 import type { Extractor, FacilityId, Game, Laboratory, PlotIndex, ResearchId } from '../domain/types';
 import {
   bestExtractorIncomeForPlot,
@@ -49,6 +49,11 @@ export function decide(game: Game, now: number): Action | null {
 function findDepletedExtractorAction(game: Game): Action | null {
   for (const f of game.facilities.values()) {
     if (f.kind !== 'extractor' || f.state !== 'idle') continue;
+    // 再生する農場なら破壊しない
+    if (f.resourceType === "agriculture" 
+        && (game.player.completedResearch.has('sustainable-farming' as ResearchId)
+        || game.player.activeResearchIds.has('sustainable-farming' as ResearchId))
+    ) continue;
     const deposit = game.plots[f.plotIndex].deposits.find(d => d.type === f.resourceType);
     if (deposit?.current === 0) {
       return { kind: 'demolish', plotIndex: f.plotIndex };
@@ -59,17 +64,15 @@ function findDepletedExtractorAction(game: Game): Action | null {
 
 // ── 農産優位判定 ─────────────────────────────────────────────────
 
-/** 全 deposit の abundance に占める agriculture の割合が 40% 超か */
+/** agricultureがDominantなdepositが5つ以上 */
 function isAgriDominant(game: Game): boolean {
-  let agriTotal = 0;
-  let allTotal  = 0;
-  for (const plot of game.plots) {
-    for (const d of plot.deposits) {
-      allTotal += d.abundance;
-      if (d.type === 'agriculture') agriTotal += d.abundance;
-    }
-  }
-  return allTotal > 0 && agriTotal / allTotal > 1;// まだバグ多いため
+  const dominantPlots = game.plots.filter(plot => {
+      const maxAbundance = Math.max(...plot.deposits.map(d => d.abundance));
+      if (maxAbundance <= 0) return false;
+      const targetAbundance = plot.deposits.find(d => d.type === 'agriculture')?.abundance ?? 0;
+      return targetAbundance >= maxAbundance && targetAbundance > 500;
+    });
+  return dominantPlots.length > 4;
 }
 
 /** 建設中・稼働中の農場 (agriculture Extractor) の数 */
@@ -107,7 +110,7 @@ function pickBestAction(game: Game, remaining: number): Action | null {
       const cost = getResearchCost(entry, game.player.completedResearch);
       const gain = researchScoreGain(game, entry, remaining);
       if (gain > 0) {
-        const lab = findLab(game);
+        const lab = findIdleLab(game);
         if (lab) {
           candidates.push({ action: { kind: 'research', labId: lab.id, entry }, gain, cost });
         }
@@ -121,7 +124,7 @@ function pickBestAction(game: Game, remaining: number): Action | null {
     const sfActive = game.player.activeResearchIds.has(sfId);
     if (!sfDone && !sfActive) {
       const sfEntry = RESEARCH_CATALOG.find(e => e.key === 'sustainable-farming');
-      const lab     = findLab(game);
+      const lab     = findIdleLab(game);
       if (sfEntry && lab) {
         const cost = getResearchCost(sfEntry, game.player.completedResearch);
         candidates.push({ action: { kind: 'research', labId: lab.id, entry: sfEntry }, gain: Infinity, cost });
@@ -129,22 +132,9 @@ function pickBestAction(game: Game, remaining: number): Action | null {
     }
   }
 
-  // sustainable-farming 研究済み → regen-efficiency を最優先で研究
-  const sfDone = (game.player.completedResearch.get('sustainable-farming' as ResearchId) ?? 0) > 0;
-  if (sfDone) {
-    const regenEntry = RESEARCH_CATALOG.find(e => e.key === 'regen-efficiency');
-    const lab        = findLab(game);
-    if (regenEntry && lab &&
-        !game.player.activeResearchIds.has(regenEntry.key) &&
-        domainIsResearchAvailable(regenEntry, game.player.completedResearch, game.player.funds, game.facilities)) {
-      const cost = getResearchCost(regenEntry, game.player.completedResearch);
-      candidates.push({ action: { kind: 'research', labId: lab.id, entry: regenEntry }, gain: Infinity, cost });
-    }
-  }
-
   // ── 建設候補 ───────────────────────────────────────────────────
   const available = getAvailableFacilityKeys(game.player.completedResearch);
-  const labExists  = hasAnyLab(game);
+  const labExists  = hasAnyUsableLab(game);
   for (let i = 0; i < game.plots.length; i++) {
     const plotIndex = i as PlotIndex;
     if (game.plots[plotIndex].facilityId !== null) continue;
@@ -175,7 +165,7 @@ function pickBestAction(game: Game, remaining: number): Action | null {
 
   if (bestAffordable === null) return null;
   // 研究したいができない、ならキャンセル
-  if(bestAffordable.action.kind === "research" && findLab(game)?.state !== "idle") return null;
+  if (bestAffordable.action.kind === "research" && game.facilities.get(bestAffordable.action.labId)?.state !== "idle") return null;
 
 
   // より高価値な unaffordable 候補があれば資金を温存
@@ -253,8 +243,8 @@ function surplusFundsForMonuments(game: Game, remaining: number): number {
  * 余剰なし・研究候補なし・lab が idle でなければ null。
  */
 function decideSurplusResearchForMonuments(game: Game, remaining: number): Action | null {
-  const lab = findLab(game);
-  if (!lab || lab.state !== 'idle') return null;
+  const lab = findIdleLab(game);
+  if (!lab) return null;
 
   const surplus = surplusFundsForMonuments(game, remaining);
   if (surplus <= 0) return null;
@@ -286,8 +276,8 @@ function decideConstructionResearchForMonuments(game: Game, remaining: number): 
   if (!entry) return null;
   if (!isResearchAvailable(entry, game)) return null;
 
-  const lab = findLab(game);
-  if (!lab || lab.state !== 'idle') return null;
+  const lab = findIdleLab(game);
+  if (!lab) return null;
 
   // 研究後の状態をシミュレートして Monument 建設可能数を比較
   const currentLevel = game.player.completedResearch.get('construction-efficiency' as ResearchId) ?? 0;
@@ -351,15 +341,17 @@ function calcFacilityROI(
 
   switch (entry.kind) {
     case 'extractor':
-      if (rushingAgri && entry.resourceType === 'agriculture') return Infinity;
-      return extractorROI(game, plotIndex, entry, remaining);
+      let roi = extractorROI(game, plotIndex, entry, remaining);
+      if (rushingAgri && entry.resourceType === 'agriculture') roi += 1000;
+      return roi;
     case 'refinery':   return refineryROI(game, entry, plotIndex, remaining);
     case 'laboratory': {
       if (rushingAgri) return 0;
       const operatingMs     = Math.max(0, remaining - effectiveBuildMs(game));
       const opportunityCost = bestExtractorIncomeForPlot(game, plotIndex, operatingMs);
-      // 1基目: gain = 1_000 × cost − opportunityCost （常に他候補を上回る大きさ）
-      if (!hasAnyLab(game)) return 1_000 - opportunityCost / entry.buildCost;
+      // sustainable-farming / alternative-building を研究中の lab は長時間占有されるため、
+      // ROI 計算上は「使える lab がない」と見なして 1基目扱いにする
+      if (!hasAnyUsableLab(game)) return 1_000 - opportunityCost / entry.buildCost;
       return bestAvailableResearchROI(game, operatingMs) - opportunityCost / entry.buildCost;
     }
     default: return 0;
@@ -375,11 +367,22 @@ export function findLab(game: Game): Laboratory | null {
   return null;
 }
 
-function hasAnyLab(game: Game): boolean {
-  return [...game.facilities.values()].some(
-    f => f.kind === 'laboratory' &&
-        (f.state === 'idle' || f.state === 'constructing' || f.state === 'processing'),
-  );
+function findIdleLab(game: Game): Laboratory | null {
+  for (const f of game.facilities.values()) {
+    if (f.kind === 'laboratory' && f.state === 'idle') return f as Laboratory;
+  }
+  return null;
+}
+
+const LONG_SPECIAL_RESEARCH_KEYS = new Set(['sustainable-farming', 'alternative-building']);
+
+/** sustainable-farming / alternative-building を研究中の lab を除いた「利用可能な lab」が存在するか */
+function hasAnyUsableLab(game: Game): boolean {
+  return [...game.facilities.values()].some(f => {
+    if (f.kind !== 'laboratory') return false;
+    if (f.state === 'idle' || f.state === 'constructing') return true;
+    return f.state === 'processing' && !LONG_SPECIAL_RESEARCH_KEYS.has((f as Laboratory).activeResearchId as string);
+  });
 }
 
 function countEmptyPlots(game: Game): number {

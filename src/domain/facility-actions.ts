@@ -98,7 +98,7 @@ function getConstructionMultiplier(completedResearch: Map<ResearchId, number>): 
 
 /**
  * 鉱物活用建築による建設コスト割引率を返す（0〜1）。
- * 割引率 = mineral_abundance × 0.0002 × 1.2^(alternativity-efficiency レベル)、上限1.0。
+ * 割引率 = mineral_abundance × 0.0004 × 1.2^(alternativity-efficiency レベル)、上限1.0。
  */
 export function getMineralBuildDiscountRate(
   plotIndex: PlotIndex,
@@ -109,7 +109,20 @@ export function getMineralBuildDiscountRate(
   const mineralDeposit = plots[plotIndex].deposits.find((d) => d.type === 'mineral');
   if (!mineralDeposit) return 0;
   const effLevel = completedResearch.get(ALTERNATIVITY_EFFICIENCY_KEY) ?? 0;
-  return Math.min(1, mineralDeposit.abundance * 0.0002 * Math.pow(1.2, effLevel));
+  return Math.min(1, mineralDeposit.abundance * 0.0004 * Math.pow(1.2, effLevel));
+}
+
+/**
+ * 農産資源の1秒あたりの再生速度（単位/秒）を返す。
+ * sustainable-farming が未研究の場合は 0。
+ */
+export function getAgriRegenRatePerSec(
+  abundance: number,
+  completedResearch: Map<ResearchId, number>,
+): number {
+  if ((completedResearch.get(SUSTAINABLE_FARMING_KEY) ?? 0) === 0) return 0;
+  const regenLevel = completedResearch.get(REGEN_EFFICIENCY_KEY) ?? 0;
+  return abundance * 0.003 * Math.pow(1.2, regenLevel);
 }
 
 function getRefineryResearchMultiplier(completedResearch: Map<ResearchId, number>): number {
