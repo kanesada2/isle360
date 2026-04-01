@@ -173,7 +173,6 @@ export function bestExtractorIncomeForPlot(game: Game, plotIndex: PlotIndex, ope
 
 /** ROI計算が未実装の研究（special 系など） */
 const SKIP_RESEARCH_KEYS = new Set([
-  'alternative-building',
   'alternativity-efficiency',
 ]);
 
@@ -365,6 +364,51 @@ function estimateEfficiencyGain(game: Game, entry: ResearchCatalogEntry, remaini
       gain += futureMined * deposit.gain * (newMult - curMult);
     }
     return gain;
+  }
+
+  if ((entry.key as string) === 'alternative-building') {
+    // mineral-survey 未完了なら効果なし
+    if ((game.player.completedResearch.get(r('mineral-survey')) ?? 0) === 0) return 0;
+    // 空きマスがなければ効果なし
+    const emptyIndices = game.plots
+      .map((p, i) => p.facilityId === null ? i as PlotIndex : null)
+      .filter((i): i is PlotIndex => i !== null);
+    if (emptyIndices.length === 0) return 0;
+
+    const refineMult  = currentRefineryMult(game);
+    const RESEARCH_MS = 75_000;
+    const operatingSec = RESEARCH_MS / 1000;
+
+    // Refinery を1基追加した場合の既存 Extractor への75秒追加収入
+    const newMult   = refineryMultForNew(game);
+    const multDiff  = newMult - refineMult;
+    let refineryGain = 0;
+    for (const f of game.facilities.values()) {
+      if (f.kind !== 'extractor' || f.state !== 'idle') continue;
+      const ext = f as Extractor;
+      const dep = game.plots[ext.plotIndex].deposits.find(d => d.type === ext.resourceType);
+      if (!dep || dep.current <= 0) continue;
+      const effLevel   = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[ext.resourceType]) ?? 0;
+      const ratePerSec = Math.pow(1.2, effLevel) * 5;
+      refineryGain += Math.min(ratePerSec * operatingSec, dep.current) * dep.gain * multDiff;
+    }
+
+    // 各空きマスで Extractor（フェーズ問わず全資源）または Refinery の最大収入を算出
+    const plotIncomes = emptyIndices.map(plotIndex => {
+      let extractorBest = 0;
+      for (const deposit of game.plots[plotIndex].deposits) {
+        if (deposit.current <= 0) continue;
+        const effLevel   = game.player.completedResearch.get(EXTRACTION_RESEARCH_KEYS[deposit.type]) ?? 0;
+        const ratePerSec = Math.pow(1.2, effLevel) * 5;
+        const income     = Math.min(ratePerSec * operatingSec, deposit.current) * deposit.gain * refineMult;
+        if (income > extractorBest) extractorBest = income;
+      }
+      return Math.max(extractorBest, refineryGain);
+    });
+
+    // 最も価値の低い空きマスの収入を x とし、3600 - x を価値とする
+    const x = Math.min(...plotIncomes);
+    return Math.max(0, 3600 - x);
   }
 
   // 特許系研究: baseCost=0、残り時間分のパッシブ収入をそのまま返す

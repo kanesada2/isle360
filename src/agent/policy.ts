@@ -32,6 +32,9 @@ export function decide(game: Game, now: number): Action | null {
   const depletedDemo = findDepletedExtractorAction(game);
   if (depletedDemo) return depletedDemo;
 
+  const excessLabDemo = findExcessLabDemolishAction(game, remaining);
+  if (excessLabDemo) return excessLabDemo;
+
   if (shouldBuildMonument(game, remaining)) {
     const constructionResearch = decideConstructionResearchForMonuments(game, remaining);
     if (constructionResearch) return constructionResearch;
@@ -60,6 +63,25 @@ function findDepletedExtractorAction(game: Game): Action | null {
     }
   }
   return null;
+}
+
+// ── Monument フェーズでの余剰 Lab 破壊 ───────────────────────────
+
+/**
+ * Monument フェーズに入っており、Lab が2基以上ある場合、
+ * idle な Lab を1基返す（合計1基になるまで繰り返し破壊される）。
+ */
+function findExcessLabDemolishAction(game: Game, remaining: number): Action | null {
+  if (!shouldBuildMonument(game, remaining)) return null;
+  const allLabs = [...game.facilities.values()].filter(f => f.kind === 'laboratory');
+  // demolishing 中のものは既に「消える予定」なので残存数から除く
+  const remainingLabs = allLabs.filter(f => f.state !== 'demolishing');
+  if (remainingLabs.length <= 1) return null;
+  const idleLab = allLabs.find(f => f.state === 'idle') as Laboratory | undefined;
+  if (!idleLab) return null;
+  const idx = game.plots.findIndex(p => p.facilityId === idleLab.id);
+  if (idx === -1) return null;
+  return { kind: 'demolish', plotIndex: idx as PlotIndex };
 }
 
 // ── 農産優位判定 ─────────────────────────────────────────────────
