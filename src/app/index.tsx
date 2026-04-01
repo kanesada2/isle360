@@ -31,11 +31,24 @@ export default function TopScreen() {
   const [replayModalVisible, setReplayModalVisible] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [seedModalVisible, setSeedModalVisible] = useState(false);
+  const [seedInput, setSeedInput] = useState('');
 
   function handleDemo() {
     const game = runAgent(startGame(createGame({ sessionDurationMs: 360_000, initialFunds: 1_000 }), 0));
     const token = encodeLogs(game.logs);
     router.push({ pathname: '/replay', params: { token } });
+  }
+
+  function handleSeedConfirm() {
+    const seed = parseInt(seedInput.trim(), 10);
+    if (!Number.isFinite(seed) || seedInput.trim() === '') {
+      Alert.alert('エラー', '有効な数値を入力してください。');
+      return;
+    }
+    setSeedModalVisible(false);
+    setSeedInput('');
+    router.push({ pathname: '/game', params: { seed: String(seed) } });
   }
 
   function handleReplayConfirm() {
@@ -76,9 +89,9 @@ export default function TopScreen() {
                 backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
               },
             ]}
-            onPress={() => router.push('/tutorial')}
+            onPress={() => setSeedModalVisible(true)}
           >
-            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Tutorial</Text>
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Seed</Text>
           </Pressable>
 
           <Pressable
@@ -89,9 +102,9 @@ export default function TopScreen() {
                 backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
               },
             ]}
-            onPress={handleDemo}
+            onPress={() => router.push('/tutorial')}
           >
-            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Demo</Text>
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Tutorial</Text>
           </Pressable>
 
           <Pressable
@@ -115,6 +128,19 @@ export default function TopScreen() {
                 backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
               },
             ]}
+            onPress={handleDemo}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Demo</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                borderColor: colors.text,
+                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
+              },
+            ]}
             onPress={() => setSettingsModalVisible(true)}
           >
             <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Options</Text>
@@ -126,6 +152,49 @@ export default function TopScreen() {
         visible={settingsModalVisible}
         onClose={() => setSettingsModalVisible(false)}
       />
+
+      {/* シード入力モーダル */}
+      <Modal
+        visible={seedModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSeedModalVisible(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setSeedModalVisible(false)}>
+          <Pressable style={[styles.tokenCard, { backgroundColor: colors.backgroundElement }]} onPress={() => {}}>
+            <Text style={[styles.tokenCardTitle, { color: colors.text }]}>シード値を入力</Text>
+            <TextInput
+              style={[styles.tokenInput, { color: colors.text, borderColor: colors.backgroundSelected, backgroundColor: colors.background, minHeight: undefined }]}
+              value={seedInput}
+              onChangeText={setSeedInput}
+              placeholder="数値を入力"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="number-pad"
+              autoFocus
+            />
+            <View style={styles.tokenCardButtons}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.tokenCancelButton,
+                  { backgroundColor: pressed ? colors.backgroundSelected : colors.background },
+                ]}
+                onPress={() => { setSeedModalVisible(false); setSeedInput(''); }}
+              >
+                <Text style={[styles.tokenButtonText, { color: colors.textSecondary }]}>キャンセル</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.tokenConfirmButton,
+                  { backgroundColor: pressed ? colors.backgroundSelected : colors.text },
+                ]}
+                onPress={handleSeedConfirm}
+              >
+                <Text style={[styles.tokenButtonText, { color: colors.background }]}>開始</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* トークン入力モーダル */}
       <Modal

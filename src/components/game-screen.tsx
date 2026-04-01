@@ -58,9 +58,11 @@ type Props = {
   tutorialStage?: TutorialStage;
   /** チュートリアル完了時のコールバック。省略時はトップ画面に戻る */
   onTutorialComplete?: () => void;
+  /** 指定シードでマップを生成する（Play with seed 用） */
+  initialMapSeed?: number;
 };
 
-export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Props) {
+export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, initialMapSeed }: Props) {
   const isReplay = !!replayLogs;
   const isTutorial = !!tutorialStage;
   const router = useRouter();
@@ -76,7 +78,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
   const [game, setGame] = useState<Game>(() =>
     isTutorial
       ? createTutorialGame(tutorialStage!)
-      : createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS, mapSeed }),
+      : createGame({ sessionDurationMs: SESSION_DURATION_MS, initialFunds: INITIAL_FUNDS, mapSeed: mapSeed ?? initialMapSeed }),
   );
 
   const gameStarted = game.status !== 'setup';
@@ -630,6 +632,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete }: Pr
           logs={game.logs}
           agentLogs={isReplay ? undefined : agentResult?.logs}
           agentScore={isReplay ? undefined : agentResult?.score}
+          mapSeed={game.mapSeed}
         />
       )}
       {/* 設定モーダル */}

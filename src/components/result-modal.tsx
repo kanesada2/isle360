@@ -1,5 +1,6 @@
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -9,8 +10,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
-import Svg, { Line, Polyline, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { Colors, Spacing } from '@/constants/theme';
 import type { ScoreBreakdown } from '@/domain/facility-actions';
@@ -27,6 +27,7 @@ type Props = {
   logs: GameLogEntry[];
   agentLogs?: GameLogEntry[];
   agentScore?: number;
+  mapSeed?: number;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -186,16 +187,25 @@ type ScoreTabProps = {
   breakdown: ScoreBreakdown;
   logs: GameLogEntry[];
   colors: AppColors;
+  mapSeed?: number;
 };
 
-function ScoreTab({ breakdown, logs, colors }: ScoreTabProps) {
+function ScoreTab({ breakdown, logs, colors, mapSeed }: ScoreTabProps) {
   const token = useMemo(() => encodeLogs(logs), [logs]);
   const [copied, setCopied] = useState(false);
+  const [seedCopied, setSeedCopied] = useState(false);
 
   function handleCopy() {
     Clipboard.setStringAsync(token);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleSeedCopy() {
+    if (mapSeed === undefined) return;
+    Clipboard.setStringAsync(String(mapSeed));
+    setSeedCopied(true);
+    setTimeout(() => setSeedCopied(false), 2000);
   }
 
   return (
@@ -207,12 +217,26 @@ function ScoreTab({ breakdown, logs, colors }: ScoreTabProps) {
         </Text>
       </View>
 
+      {mapSeed !== undefined && (
+        <Pressable
+          style={[styles.tokenBox, { backgroundColor: colors.background, borderColor: colors.backgroundSelected }]}
+          onPress={handleSeedCopy}
+        >
+          <Text style={[styles.tokenLabel, { color: colors.textSecondary }]}>
+            {seedCopied ? 'コピーしました' : 'マップシード（タップでコピー）'}
+          </Text>
+          <Text style={[styles.tokenText, { color: colors.text }]}>
+            {mapSeed}
+          </Text>
+        </Pressable>
+      )}
+
       <Pressable
         style={[styles.tokenBox, { backgroundColor: colors.background, borderColor: colors.backgroundSelected }]}
         onPress={handleCopy}
       >
         <Text style={[styles.tokenLabel, { color: colors.textSecondary }]}>
-          {copied ? 'コピーしました' : 'ログトークン（タップでコピー）'}
+          {copied ? 'コピーしました' : 'リプレイコード（タップでコピー）'}
         </Text>
         <Text style={[styles.tokenText, { color: colors.text }]} numberOfLines={2}>
           {token}
@@ -369,7 +393,7 @@ function NpcTab({ agentLogs, agentScore, colors, onClose }: NpcTabProps) {
 
 const TAB_LABELS: Record<Tab, string> = { score: 'スコア', graph: 'グラフ', npc: 'NPCプレイ' };
 
-export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agentLogs, agentScore }: Props) {
+export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agentLogs, agentScore, mapSeed }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -403,7 +427,7 @@ export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agen
 
           {/* タブコンテンツ */}
           {activeTab === 'score'
-            ? <ScoreTab breakdown={breakdown} logs={logs} colors={colors} />
+            ? <ScoreTab breakdown={breakdown} logs={logs} colors={colors} mapSeed={mapSeed} />
             : activeTab === 'graph'
               ? <GraphTab logs={logs} colors={colors} />
               : <NpcTab agentLogs={agentLogs} agentScore={agentScore} colors={colors} onClose={onClose} />
