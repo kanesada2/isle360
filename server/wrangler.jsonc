@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "server",
+  "compatibility_date": "2025-08-03",
+  "main": "./src/index.tsx",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "isle",
+      "database_id": "320b65f9-707b-40cf-9542-1938485478c1",
+    }
+  ]
+}
