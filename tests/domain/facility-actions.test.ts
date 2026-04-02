@@ -948,3 +948,150 @@ describe("特許収入", () => {
     expect(after).toBe(game);
   });
 });
+
+// ── 停止中 (stopped) Extractor ─────────────────────────────────
+
+describe("停止中 (stopped) Extractor", () => {
+  const MINERAL_ENTRY = FACILITY_CATALOG.find((e) => e.key === "extractor-mineral")!;
+
+  /** agriculture deposit.current を 0 にしたゲームを返す */
+  function makeDepletedAgriGame(funds = 1_000, completedResearch = new Map<ResearchId, number>()): Game {
+    const game = makeGame(funds, completedResearch);
+    return {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 0 } : d)) }
+          : p,
+      ),
+    };
+  }
+
+  it("deposit が 0 の状態でサイクルが来ると idle Extractor が stopped に遷移する", () => {
+    let game = makeDepletedAgriGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS); // idle に
+    expect([...game.facilities.values()][0].state).toBe("idle");
+
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // 1 サイクル分経過 → stopped
+    expect([...game.facilities.values()][0].state).toBe("stopped");
+  });
+
+  it("稼働中に deposit が尽きると、次のサイクルで stopped に遷移する", () => {
+    let game = makeGame(1_000);
+    // current = 1（1 サイクル分だけ）
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 1 } : d)) }
+          : p,
+      ),
+    };
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);       // idle に
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // 1 サイクル → 採掘し current=0、idle のまま
+    expect([...game.facilities.values()][0].state).toBe("idle");
+
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 400); // 次サイクル → stopped に
+    expect([...game.facilities.values()][0].state).toBe("stopped");
+  });
+
+  it("stopped 状態では採掘を行わない（資金が変わらない）", () => {
+    let game = makeDepletedAgriGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // stopped に
+    const fundsAtStop = game.player.funds;
+
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 10_200); // 10 秒後
+    expect(game.player.funds).toBe(fundsAtStop);
+  });
+
+  it("sustainable-farming 研究済みの農場は deposit=0 でも stopped にならない", () => {
+    let game = makeDepletedAgriGame(1_000, research(["sustainable-farming", 1]));
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200);
+    expect([...game.facilities.values()][0].state).toBe("idle");
+  });
+
+  it("stopped Extractor は deposit が正になると次の tick で idle に戻る", () => {
+    let game = makeDepletedAgriGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);       // idle に（construction 完了）
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // stopped に（1 サイクル、deposit=0）
+    expect([...game.facilities.values()][0].state).toBe("stopped");
+
+    // deposit.current を手動で正の値に戻す
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 10 } : d)) }
+          : p,
+      ),
+    };
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 400);
+    expect([...game.facilities.values()][0].state).toBe("idle");
+  });
+
+  it("stopped から idle に戻った後は採掘を再開する", () => {
+    let game = makeDepletedAgriGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // stopped に
+
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 10 } : d)) }
+          : p,
+      ),
+    };
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 400); // idle に（lastCycleAt リセット）
+    const fundsAfterResume = game.player.funds;
+
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 600); // 1 サイクル採掘
+    expect(game.player.funds).toBeGreaterThan(fundsAfterResume);
+  });
+
+  it("computeFundsPerSecond が stopped Extractor を 0 として扱う", () => {
+    let game = makeDepletedAgriGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);       // idle に
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // stopped に
+    expect([...game.facilities.values()][0].state).toBe("stopped");
+    expect(computeFundsPerSecond(game)).toBe(0);
+  });
+
+  it("sustainable-farming 農場は deposit が再生された後の tick で採掘を再開する", () => {
+    // sustainable-farming あり → deposit=0 でも stopped にならず idle を維持
+    // regen により deposit > 0 になると次の tick で採掘が行われる
+    let game = makeDepletedAgriGame(1_000, research(["sustainable-farming", 1]));
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);       // idle に（construction 完了）
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // idle のまま（deposit=0 だが sustainable-farming）
+    expect([...game.facilities.values()][0].state).toBe("idle");
+
+    // 10 秒後：regen が走り deposit > 0 になる（この tick では採掘未発生）
+    const tick1 = tickFacilities(game, NOW + BUILD_DURATION_MS + 10_200);
+    // さらに 1 サイクル後：deposit > 0 で採掘が発生する
+    const tick2 = tickFacilities(tick1, NOW + BUILD_DURATION_MS + 10_400);
+    expect(tick2.player.funds).toBeGreaterThan(game.player.funds);
+  });
+
+  it("mineral Extractor は deposit=0 で stopped に遷移する", () => {
+    let game = makeGame(2_000, research(["mineral-survey", 1]));
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0
+          ? { ...p, deposits: p.deposits.map((d) => (d.type === "mineral" ? { ...d, current: 0 } : d)) }
+          : p,
+      ),
+    };
+    game = buildFacility(game, 0, MINERAL_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);       // idle に
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 200); // stopped に
+    expect([...game.facilities.values()][0].state).toBe("stopped");
+  });
+});

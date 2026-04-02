@@ -356,6 +356,16 @@ export function tickFacilities(game: Game, now: number): Game {
       }
     }
 
+    // ── 停止中 Extractor: 資源が回復していれば再開 ───────────────────
+    if (facility.kind === 'extractor' && facility.state === 'stopped') {
+      const deposit = newPlots[facility.plotIndex].deposits.find(d => d.type === (facility as Extractor).resourceType);
+      if (deposit && deposit.current > 0) {
+        newFacilities.set(id, { ...(facility as Extractor), state: 'idle' as const, lastCycleAt: now });
+        changed = true;
+      }
+      continue;
+    }
+
     // ── Extractor 採掘処理 ────────────────────────────────────────
     if (facility.state !== 'idle' || facility.kind !== 'extractor') continue;
     const extractor = facility as Extractor;
@@ -375,7 +385,16 @@ export function tickFacilities(game: Game, now: number): Game {
     if (depositIdx === -1) continue;
 
     const deposit = plot.deposits[depositIdx];
-    if (deposit.current <= 0) continue;
+    if (deposit.current <= 0) {
+      // 再生しない農場以外は停止状態に遷移
+      const isSustainableAgri = extractor.resourceType === 'agriculture' &&
+        (newPlayer.completedResearch.get(SUSTAINABLE_FARMING_KEY) ?? 0) > 0;
+      if (!isSustainableAgri) {
+        newFacilities.set(id, { ...extractor, state: 'stopped' as const });
+        changed = true;
+      }
+      continue;
+    }
 
     // 研究倍率を適用した採掘量
     const multiplier = getExtractionMultiplier(extractor.resourceType, newPlayer.completedResearch);
@@ -491,7 +510,7 @@ export function getFacilityDetailRows(
   facilities: Map<FacilityId, Facility>,
   completedResearch: Map<ResearchId, number>,
 ): FacilityDetailRow[] {
-  if (facility.state !== 'idle') return [];
+  if (facility.state !== 'idle' && facility.state !== 'stopped') return [];
 
   if (facility.kind === 'extractor') {
     const level = completedResearch.get(EXTRACTION_RESEARCH_KEYS[facility.resourceType]) ?? 0;

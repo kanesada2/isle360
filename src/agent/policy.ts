@@ -48,17 +48,12 @@ export function decide(game: Game, now: number): Action | null {
 
 // ── 枯渇 Extractor 即時解体 ───────────────────────────────────────
 
-/** 資源が枯渇した idle Extractor があれば即時解体アクションを返す */
+/** 停止中 Extractor があれば即時解体アクションを返す */
 function findDepletedExtractorAction(game: Game): Action | null {
+  // sustanable-farming研究中なら待つ
+  if(game.player.activeResearchIds.has('sustainable-farming' as ResearchId)) return null;
   for (const f of game.facilities.values()) {
-    if (f.kind !== 'extractor' || f.state !== 'idle') continue;
-    // 再生する農場なら破壊しない
-    if (f.resourceType === "agriculture" 
-        && (game.player.completedResearch.has('sustainable-farming' as ResearchId)
-        || game.player.activeResearchIds.has('sustainable-farming' as ResearchId))
-    ) continue;
-    const deposit = game.plots[f.plotIndex].deposits.find(d => d.type === f.resourceType);
-    if (deposit?.current === 0) {
+    if (f.kind === 'extractor' && f.state === 'stopped') {
       return { kind: 'demolish', plotIndex: f.plotIndex };
     }
   }
@@ -413,7 +408,7 @@ function countEmptyPlots(game: Game): number {
 
 function countDemolishable(game: Game): number {
   return [...game.facilities.values()].filter(
-    f => f.kind !== 'monument' && f.state === 'idle',
+    f => f.kind !== 'monument' && (f.state === 'idle' || f.state === 'stopped'),
   ).length;
 }
 
@@ -427,7 +422,7 @@ function findFirstEmptyPlot(game: Game): PlotIndex | null {
 function findLowestValueNonMonumentPlot(game: Game, remaining: number): PlotIndex | null {
   let worst: { plotIndex: PlotIndex; value: number } | null = null;
   for (const [id, f] of game.facilities) {
-    if (f.kind === 'monument' || f.state !== 'idle') continue;
+    if (f.kind === 'monument' || (f.state !== 'idle' && f.state !== 'stopped')) continue;
     const idx = game.plots.findIndex(p => p.facilityId === id);
     if (idx === -1) continue;
     const plotIndex = idx as PlotIndex;
@@ -472,7 +467,7 @@ function lowestValueDemolishCandidates(
   if (count <= 0) return [];
   const candidates: { demolishCost: number; remainingValue: number; plotIndex: PlotIndex }[] = [];
   for (const [id, f] of game.facilities) {
-    if (f.kind === 'monument' || f.state !== 'idle') continue;
+    if (f.kind === 'monument' || (f.state !== 'idle' && f.state !== 'stopped')) continue;
     const idx = game.plots.findIndex(p => p.facilityId === id);
     if (idx === -1) continue;
     const plotIndex = idx as PlotIndex;

@@ -45,7 +45,7 @@ export type FacilityBase = {
   buildCost:    number;
   demolishCost: number;
   // 建設・撤去中は currentJob に工事ジョブが入る
-  state:        "constructing" | "demolishing" | "idle" | "processing";
+  state:        "constructing" | "demolishing" | "idle" | "processing" | "stopped";
   currentJob:   ProcessingJob | null;
 };
 

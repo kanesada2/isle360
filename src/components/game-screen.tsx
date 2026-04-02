@@ -355,6 +355,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
     [currentFacility, game.plots, game.facilities, game.player.completedResearch],
   );
 
+
   const handleFacilityTap = useCallback(() => {
     if (gameFinished) {
       setTimeout(() => setResultVisible(true), 0);
@@ -370,7 +371,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
         setTimeout(() => setLabModalVisible(true), 0);
       }
     } else if (
-      currentFacility.state === 'idle' &&
+      (currentFacility.state === 'idle' || currentFacility.state === 'stopped') &&
       (currentFacility.kind === 'extractor' || currentFacility.kind === 'refinery')
     ) {
       setTimeout(() => setFacilityDetailVisible(true), 0);
@@ -499,6 +500,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
                   {currentFacility.state === 'constructing' && '建設中'}
                   {currentFacility.state === 'demolishing' && '破壊中'}
                   {currentFacility.state === 'idle' && '稼働中'}
+                  {currentFacility.state === 'stopped' && '停止中'}
                   {currentFacility.state === 'processing' && '処理中'}
                 </Text>
               </Text>
