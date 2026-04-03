@@ -28,9 +28,11 @@ type Props = {
   items: LaunchItem[];
   /** GO ボタン押下時に呼ばれる。inputValue は入力欄がある項目のみ渡る */
   onGo: (key: string, inputValue: string) => void;
+  /** true の間 GO ボタンをローディング状態にして押せなくする */
+  goLoading?: boolean;
 };
 
-export function LaunchModal({ visible, onClose, items, onGo }: Props) {
+export function LaunchModal({ visible, onClose, items, onGo, goLoading = false }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -50,7 +52,7 @@ export function LaunchModal({ visible, onClose, items, onGo }: Props) {
   }, [selectedKey]);
 
   const selected = items.find((item) => item.key === selectedKey);
-  const goDisabled = (selected?.disabled ?? false) ||
+  const goDisabled = goLoading || (selected?.disabled ?? false) ||
     (selected?.inputType !== undefined && inputValue.trim() === '');
 
   function handleItemPress(key: string) {
@@ -141,7 +143,9 @@ export function LaunchModal({ visible, onClose, items, onGo }: Props) {
             ]}
             onPress={() => onGo(selectedKey, inputValue)}
           >
-            <Text style={[styles.goButtonText, { color: colors.background }]}>GO</Text>
+            <Text style={[styles.goButtonText, { color: colors.background }]}>
+              {goLoading ? '...' : 'GO'}
+            </Text>
           </Pressable>
 
         </Pressable>

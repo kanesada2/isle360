@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -13,28 +13,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LaunchModal, type LaunchItem } from '@/components/launch-modal';
 import { SoundSettingsModal } from '@/components/sound-settings-modal';
 import { Colors, Spacing } from '@/constants/theme';
+import { getDailySeed, upsertDailySeed } from '@/db/local';
 import { decodeLogs } from '@/domain/log-codec';
 import { useSoundContext } from '@/sound';
 
-const PLAY_ITEMS: LaunchItem[] = [
-  {
-    key: 'tutorial',
-    label: 'Tutorial',
-    description: '基本的な操作を学べるチュートリアルモードです。施設の建設や研究など、ゲームの流れをひと通り体験できます。',
-  },
-  {
-    key: 'random',
-    label: 'Random',
-    description: 'ランダムに生成されたマップでプレイします。毎回異なる資源配置が楽しめます。',
-  },
-  {
-    key: 'seed',
-    label: 'Seed',
-    description: '指定したシード値のマップでプレイします。同じシードなら同じマップが再現されます。',
-    inputType: 'seed',
-    inputPlaceholder: 'シード値（数値）を入力',
-  },
-];
+const DAILY_API = 'https://isle.guts-kk-89.workers.dev/api/daily/seed';
+
+function getTodayDate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const REPLAY_ITEMS: LaunchItem[] = [
   {
@@ -63,13 +51,73 @@ export default function TopScreen() {
   const [replayModalVisible, setReplayModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
-  function handlePlayGo(key: string, inputValue: string) {
-    setPlayModalVisible(false);
+  // Daily: 今日プレイ済みかどうか（null = 未確認）
+  const [todayPlayed, setTodayPlayed] = useState<boolean | null>(null);
+  const [dailyLoading, setDailyLoading] = useState(false);
+
+  // モーダルを開くたびに今日のレコードを確認する
+  useEffect(() => {
+    if (!playModalVisible) return;
+    getDailySeed(getTodayDate())
+      .then((row) => setTodayPlayed(row !== null))
+      .catch(() => setTodayPlayed(false));
+  }, [playModalVisible]);
+
+  const playItems = useMemo<LaunchItem[]>(() => [
+    {
+      key: 'tutorial',
+      label: 'Tutorial',
+      description: '基本的な操作を学べるチュートリアルモードです。施設の建設や研究など、ゲームの流れをひと通り体験できます。',
+    },
+    {
+      key: 'random',
+      label: 'Random',
+      description: 'ランダムに生成されたマップでプレイします。毎回異なる資源配置が楽しめます。',
+    },
+    {
+      key: 'daily',
+      label: 'Daily',
+      description: todayPlayed
+        ? '本日のデイリーチャレンジはプレイ済みです。'
+        : '今日のデイリーチャレンジです。全プレイヤーが1日1回だけ同じマップに挑戦できます。',
+      disabled: todayPlayed === true,
+    },
+    {
+      key: 'seed',
+      label: 'Seed',
+      description: '指定したシード値のマップでプレイします。同じシードなら同じマップが再現されます。',
+      inputType: 'seed',
+      inputPlaceholder: 'シード値（数値）を入力',
+    },
+  ], [todayPlayed]);
+
+  async function handlePlayGo(key: string, inputValue: string) {
     switch (key) {
+      case 'daily': {
+        const date = getTodayDate();
+        setDailyLoading(true);
+        try {
+          const res = await fetch(`${DAILY_API}?date=${date}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = (await res.json()) as { date: string; seed: number };
+          await upsertDailySeed(data.date, data.seed);
+          setTodayPlayed(true);
+          setPlayModalVisible(false);
+          router.push({ pathname: '/game', params: { seed: String(data.seed) } });
+        } catch(e) {
+          console.log(e)
+          Alert.alert('エラー', 'デイリーチャレンジの取得に失敗しました。ネットワーク接続を確認してください。');
+        } finally {
+          setDailyLoading(false);
+        }
+        break;
+      }
       case 'tutorial':
+        setPlayModalVisible(false);
         router.push('/tutorial');
         break;
       case 'random':
+        setPlayModalVisible(false);
         router.push('/game');
         break;
       case 'seed': {
@@ -78,6 +126,7 @@ export default function TopScreen() {
           Alert.alert('エラー', '有効な数値を入力してください。');
           return;
         }
+        setPlayModalVisible(false);
         router.push({ pathname: '/game', params: { seed: String(seed) } });
         break;
       }
@@ -151,8 +200,9 @@ export default function TopScreen() {
       <LaunchModal
         visible={playModalVisible}
         onClose={() => setPlayModalVisible(false)}
-        items={PLAY_ITEMS}
+        items={playItems}
         onGo={handlePlayGo}
+        goLoading={dailyLoading}
       />
 
       <LaunchModal
