@@ -20,6 +20,8 @@ import { TutorialCompleteModal } from '@/components/tutorial-complete-modal';
 import { TutorialHintModal } from '@/components/tutorial-hint-modal';
 import { Colors, Spacing } from '@/constants/theme';
 import { useSoundContext } from '@/sound';
+import { insertPlayLog } from '@/db/local';
+import { encodeLogs } from '@/domain/log-codec';
 import {
   applyReplayEvent,
   buildFacility,
@@ -199,6 +201,13 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
     setLabModalVisible(false);
     if (!isTutorial) {
       setResultVisible(true);
+      if (!isReplay) {
+        insertPlayLog({
+          seed: game.mapSeed,
+          score: computeScore(game).total,
+          log: encodeLogs(game.logs),
+        }).catch(console.error);
+      }
       // 同じシードでエージェントをシミュレートしてNPCスコアを計算（リプレイ時はスキップ）
       if (!isReplay) {
         setTimeout(() => {

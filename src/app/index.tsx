@@ -2,23 +2,54 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { runAgent } from '@/agent';
+import { LaunchModal, type LaunchItem } from '@/components/launch-modal';
 import { SoundSettingsModal } from '@/components/sound-settings-modal';
 import { Colors, Spacing } from '@/constants/theme';
-import { startGame } from '@/domain/facility-actions';
-import { createGame } from '@/domain/game';
-import { decodeLogs, encodeLogs } from '@/domain/log-codec';
+import { decodeLogs } from '@/domain/log-codec';
 import { useSoundContext } from '@/sound';
+
+const PLAY_ITEMS: LaunchItem[] = [
+  {
+    key: 'tutorial',
+    label: 'Tutorial',
+    description: '基本的な操作を学べるチュートリアルモードです。施設の建設や研究など、ゲームの流れをひと通り体験できます。',
+  },
+  {
+    key: 'random',
+    label: 'Random',
+    description: 'ランダムに生成されたマップでプレイします。毎回異なる資源配置が楽しめます。',
+  },
+  {
+    key: 'seed',
+    label: 'Seed',
+    description: '指定したシード値のマップでプレイします。同じシードなら同じマップが再現されます。',
+    inputType: 'seed',
+    inputPlaceholder: 'シード値（数値）を入力',
+  },
+];
+
+const REPLAY_ITEMS: LaunchItem[] = [
+  {
+    key: 'history',
+    label: 'History',
+    description: '過去のプレイ履歴を一覧表示します。各プレイのSeed・Score・日時を確認し、リプレイを再生できます。',
+  },
+  {
+    key: 'code',
+    label: 'Code',
+    description: 'リプレイコードを入力して再生します。結果画面のコードをペーストしてください。',
+    inputType: 'code',
+    inputPlaceholder: 'リプレイコードを貼り付け',
+  },
+];
 
 export default function TopScreen() {
   const router = useRouter();
@@ -28,40 +59,48 @@ export default function TopScreen() {
   const { playBgm } = useSoundContext();
   useFocusEffect(useCallback(() => { playBgm('main'); }, [playBgm]));
 
+  const [playModalVisible, setPlayModalVisible] = useState(false);
   const [replayModalVisible, setReplayModalVisible] = useState(false);
-  const [tokenInput, setTokenInput] = useState('');
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
-  const [seedModalVisible, setSeedModalVisible] = useState(false);
-  const [seedInput, setSeedInput] = useState('');
 
-  function handleDemo() {
-    const game = runAgent(startGame(createGame({ sessionDurationMs: 360_000, initialFunds: 1_000 }), 0));
-    const token = encodeLogs(game.logs);
-    router.push({ pathname: '/replay', params: { token } });
-  }
-
-  function handleSeedConfirm() {
-    const seed = parseInt(seedInput.trim(), 10);
-    if (!Number.isFinite(seed) || seedInput.trim() === '') {
-      Alert.alert('エラー', '有効な数値を入力してください。');
-      return;
+  function handlePlayGo(key: string, inputValue: string) {
+    setPlayModalVisible(false);
+    switch (key) {
+      case 'tutorial':
+        router.push('/tutorial');
+        break;
+      case 'random':
+        router.push('/game');
+        break;
+      case 'seed': {
+        const seed = parseInt(inputValue.trim(), 10);
+        if (!Number.isFinite(seed)) {
+          Alert.alert('エラー', '有効な数値を入力してください。');
+          return;
+        }
+        router.push({ pathname: '/game', params: { seed: String(seed) } });
+        break;
+      }
     }
-    setSeedModalVisible(false);
-    setSeedInput('');
-    router.push({ pathname: '/game', params: { seed: String(seed) } });
   }
 
-  function handleReplayConfirm() {
-    const token = tokenInput.trim();
-    try {
-      const logs = decodeLogs(token);
-      if (logs.length === 0) throw new Error('empty');
-      setReplayModalVisible(false);
-      setTokenInput('');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      router.push({ pathname: '/replay', params: { token } });
-    } catch {
-      Alert.alert('エラー', 'トークンを正しく復元できませんでした。');
+  function handleReplayGo(key: string, inputValue: string) {
+    setReplayModalVisible(false);
+    switch (key) {
+      case 'history':
+        router.push('/history');
+        break;
+      case 'code': {
+        const token = inputValue.trim();
+        try {
+          const logs = decodeLogs(token);
+          if (logs.length === 0) throw new Error('empty');
+          router.push({ pathname: '/replay', params: { token } });
+        } catch {
+          Alert.alert('エラー', 'リプレイコードを正しく復元できませんでした。');
+        }
+        break;
+      }
     }
   }
 
@@ -76,35 +115,9 @@ export default function TopScreen() {
               styles.primaryButton,
               { backgroundColor: pressed ? colors.backgroundSelected : colors.text },
             ]}
-            onPress={() => router.push('/game')}
+            onPress={() => setPlayModalVisible(true)}
           >
-            <Text style={[styles.primaryButtonText, { color: colors.background }]}>New Game</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              {
-                borderColor: colors.text,
-                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
-              },
-            ]}
-            onPress={() => setSeedModalVisible(true)}
-          >
-            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Seed</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              {
-                borderColor: colors.text,
-                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
-              },
-            ]}
-            onPress={() => router.push('/tutorial')}
-          >
-            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Tutorial</Text>
+            <Text style={[styles.primaryButtonText, { color: colors.background }]}>Play</Text>
           </Pressable>
 
           <Pressable
@@ -128,19 +141,6 @@ export default function TopScreen() {
                 backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
               },
             ]}
-            onPress={handleDemo}
-          >
-            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Demo</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              {
-                borderColor: colors.text,
-                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
-              },
-            ]}
             onPress={() => setSettingsModalVisible(true)}
           >
             <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Options</Text>
@@ -148,96 +148,24 @@ export default function TopScreen() {
         </View>
       </View>
 
+      <LaunchModal
+        visible={playModalVisible}
+        onClose={() => setPlayModalVisible(false)}
+        items={PLAY_ITEMS}
+        onGo={handlePlayGo}
+      />
+
+      <LaunchModal
+        visible={replayModalVisible}
+        onClose={() => setReplayModalVisible(false)}
+        items={REPLAY_ITEMS}
+        onGo={handleReplayGo}
+      />
+
       <SoundSettingsModal
         visible={settingsModalVisible}
         onClose={() => setSettingsModalVisible(false)}
       />
-
-      {/* シード入力モーダル */}
-      <Modal
-        visible={seedModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSeedModalVisible(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setSeedModalVisible(false)}>
-          <Pressable style={[styles.tokenCard, { backgroundColor: colors.backgroundElement }]} onPress={() => {}}>
-            <Text style={[styles.tokenCardTitle, { color: colors.text }]}>シード値を入力</Text>
-            <TextInput
-              style={[styles.tokenInput, { color: colors.text, borderColor: colors.backgroundSelected, backgroundColor: colors.background, minHeight: undefined }]}
-              value={seedInput}
-              onChangeText={setSeedInput}
-              placeholder="数値を入力"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="number-pad"
-              autoFocus
-            />
-            <View style={styles.tokenCardButtons}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tokenCancelButton,
-                  { backgroundColor: pressed ? colors.backgroundSelected : colors.background },
-                ]}
-                onPress={() => { setSeedModalVisible(false); setSeedInput(''); }}
-              >
-                <Text style={[styles.tokenButtonText, { color: colors.textSecondary }]}>キャンセル</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tokenConfirmButton,
-                  { backgroundColor: pressed ? colors.backgroundSelected : colors.text },
-                ]}
-                onPress={handleSeedConfirm}
-              >
-                <Text style={[styles.tokenButtonText, { color: colors.background }]}>開始</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* トークン入力モーダル */}
-      <Modal
-        visible={replayModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setReplayModalVisible(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setReplayModalVisible(false)}>
-          <Pressable style={[styles.tokenCard, { backgroundColor: colors.backgroundElement }]} onPress={() => {}}>
-            <Text style={[styles.tokenCardTitle, { color: colors.text }]}>ログトークンを入力</Text>
-            <TextInput
-              style={[styles.tokenInput, { color: colors.text, borderColor: colors.backgroundSelected, backgroundColor: colors.background }]}
-              value={tokenInput}
-              onChangeText={setTokenInput}
-              placeholder="トークンを貼り付け"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              autoFocus
-            />
-            <View style={styles.tokenCardButtons}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tokenCancelButton,
-                  { backgroundColor: pressed ? colors.backgroundSelected : colors.background },
-                ]}
-                onPress={() => { setReplayModalVisible(false); setTokenInput(''); }}
-              >
-                <Text style={[styles.tokenButtonText, { color: colors.textSecondary }]}>キャンセル</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tokenConfirmButton,
-                  { backgroundColor: pressed ? colors.backgroundSelected : colors.text },
-                ]}
-                onPress={handleReplayConfirm}
-              >
-                <Text style={[styles.tokenButtonText, { color: colors.background }]}>再生</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -281,52 +209,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.5,
-  },
-  // トークン入力モーダル
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-  },
-  tokenCard: {
-    width: '100%',
-    borderRadius: Spacing.three,
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
-  tokenCardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  tokenInput: {
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    padding: Spacing.two,
-    fontSize: 12,
-    fontFamily: 'monospace',
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  tokenCardButtons: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  tokenCancelButton: {
-    flex: 1,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    alignItems: 'center',
-  },
-  tokenConfirmButton: {
-    flex: 1,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    alignItems: 'center',
-  },
-  tokenButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 });
