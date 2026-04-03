@@ -1,8 +1,18 @@
 import { Hono } from 'hono'
 import { env } from 'hono/adapter'
+import { cors } from 'hono/cors'
 import { renderer } from './renderer'
 
+const ALLOWED_ORIGINS = [
+  'http://localhost:8081',
+  'https://island-360.pages.dev',
+]
+
 const app = new Hono()
+
+app.use('*', cors({
+  origin: (origin) => ALLOWED_ORIGINS.includes(origin) ? origin : null,
+}))
 
 app.use(renderer)
 
