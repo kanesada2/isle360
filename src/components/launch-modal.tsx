@@ -20,6 +20,8 @@ export type LaunchItem = {
   inputType?: 'seed' | 'code';
   inputPlaceholder?: string;
   disabled?: boolean;
+  /** GO ボタンの代替ラベル */
+  goLabel?: string;
 };
 
 type Props = {
@@ -144,7 +146,7 @@ export function LaunchModal({ visible, onClose, items, onGo, goLoading = false }
             onPress={() => onGo(selectedKey, inputValue)}
           >
             <Text style={[styles.goButtonText, { color: colors.background }]}>
-              {goLoading ? '...' : 'GO'}
+              {goLoading ? '...' : (selected?.goLabel ?? 'GO')}
             </Text>
           </Pressable>
 

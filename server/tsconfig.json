@@ -8,8 +8,8 @@
     "lib": [
       "ESNext"
     ],
-    "types": ["vite/client"],
+    "types": ["vite/client", "./worker-configuration.d.ts"],
     "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
+    "jsxImportSource": "hono/jsx",
   },
 }

@@ -12,10 +12,6 @@ export async function initDb(): Promise<void> {
       log        TEXT    NOT NULL,
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS daily_seed (
-      date        TEXT    PRIMARY KEY,
-      seed        INTEGER NOT NULL
-    );
   `);
 }
 
@@ -43,30 +39,6 @@ export async function insertPlayLog(params: {
   await db.runAsync(
     'DELETE FROM play_log WHERE id NOT IN (SELECT id FROM play_log ORDER BY created_at DESC LIMIT 20)',
   );
-}
-
-// ── daily_seed ────────────────────────────────────────────────
-
-export type DailySeedRow = {
-  date: string;
-  seed: number;
-};
-
-export async function upsertDailySeed(date: string, seed: number): Promise<void> {
-  const db = await dbPromise;
-  await db.runAsync(
-    'INSERT INTO daily_seed (date, seed) VALUES (?, ?) ON CONFLICT(date) DO NOTHING',
-    date,
-    seed,
-  );
-}
-
-export async function getDailySeed(date: string): Promise<DailySeedRow | null> {
-  const db = await dbPromise;
-  return db.getFirstAsync<DailySeedRow>(
-    'SELECT * FROM daily_seed WHERE date = ?',
-    date,
-  ) ?? null;
 }
 
 // ── play_log ──────────────────────────────────────────────────

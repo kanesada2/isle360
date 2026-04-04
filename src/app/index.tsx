@@ -1,7 +1,9 @@
+import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,8 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LaunchModal, type LaunchItem } from '@/components/launch-modal';
 import { SoundSettingsModal } from '@/components/sound-settings-modal';
 import { Colors, Spacing } from '@/constants/theme';
-import { getDailySeed, upsertDailySeed } from '@/db/local';
 import { decodeLogs } from '@/domain/log-codec';
+import { authClient } from '@/lib/auth-client';
 import { useSoundContext } from '@/sound';
 
 const DAILY_API = 'https://isle.guts-kk-89.workers.dev/api/daily/seed';
@@ -47,69 +49,109 @@ export default function TopScreen() {
   const { playBgm } = useSoundContext();
   useFocusEffect(useCallback(() => { playBgm('main'); }, [playBgm]));
 
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+
   const [playModalVisible, setPlayModalVisible] = useState(false);
   const [replayModalVisible, setReplayModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
   // Daily: 今日プレイ済みかどうか（null = 未確認）
   const [todayPlayed, setTodayPlayed] = useState<boolean | null>(null);
-  const [dailyLoading, setDailyLoading] = useState(false);
+  const [dailySeedData, setDailySeedData] = useState<{ date: string; seed: number } | null>(null);
+  const [dailyFetching, setDailyFetching] = useState(false);
+  const [dailyFetchError, setDailyFetchError] = useState(false);
+  const [dailyAlreadyPlayed, setDailyAlreadyPlayed] = useState(false);
 
-  // モーダルを開くたびに今日のレコードを確認する
+  // モーダルを開くたびに今日のレコード確認 + API フェッチを同時に行う（ログイン済みの場合のみ）
   useEffect(() => {
     if (!playModalVisible) return;
-    getDailySeed(getTodayDate())
-      .then((row) => setTodayPlayed(row !== null))
-      .catch(() => setTodayPlayed(false));
-  }, [playModalVisible]);
+    if (!session) return;
 
-  const playItems = useMemo<LaunchItem[]>(() => [
-    {
-      key: 'tutorial',
-      label: 'Tutorial',
-      description: '基本的な操作を学べるチュートリアルモードです。施設の建設や研究など、ゲームの流れをひと通り体験できます。',
-    },
-    {
-      key: 'random',
-      label: 'Random',
-      description: 'ランダムに生成されたマップでプレイします。毎回異なる資源配置が楽しめます。',
-    },
-    {
-      key: 'daily',
-      label: 'Daily',
-      description: todayPlayed
-        ? '本日のデイリーチャレンジはプレイ済みです。'
-        : '今日のデイリーチャレンジです。全プレイヤーが1日1回だけ同じマップに挑戦できます。',
-      disabled: todayPlayed === true,
-    },
-    {
-      key: 'seed',
-      label: 'Seed',
-      description: '指定したシード値のマップでプレイします。同じシードなら同じマップが再現されます。',
-      inputType: 'seed',
-      inputPlaceholder: 'シード値（数値）を入力',
-    },
-  ], [todayPlayed]);
+    const date = getTodayDate();
+
+    setDailySeedData(null);
+    setDailyFetchError(false);
+    setDailyAlreadyPlayed(false);
+    setDailyFetching(true);
+    fetch(`${DAILY_API}?date=${date}`, { credentials: 'include' })
+      .then(async (res) => {
+        if (res.status === 409) {
+          setDailyAlreadyPlayed(true);
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as { date: string; seed: number };
+        setDailySeedData(data);
+      })
+      .catch(() => setDailyFetchError(true))
+      .finally(() => setDailyFetching(false));
+  }, [playModalVisible, session]);
+
+  const playItems = useMemo<LaunchItem[]>(() => {
+    const needsLogin = !session && !sessionPending;
+    return [
+      {
+        key: 'tutorial',
+        label: 'Tutorial',
+        description: '基本的な操作を学べるチュートリアルモードです。施設の建設や研究など、ゲームの流れをひと通り体験できます。',
+      },
+      {
+        key: 'random',
+        label: 'Random',
+        description: 'ランダムに生成されたマップでプレイします。毎回異なる資源配置が楽しめます。',
+      },
+      {
+        key: 'score',
+        label: 'Score',
+        description: needsLogin
+          ? 'プレイするにはログインが必要です。'
+          : 'ランダムマップでスコアを記録します。ログインしているとランキングに登録されます。',
+        goLabel: needsLogin ? 'サインイン' : undefined,
+      },
+      {
+        key: 'daily',
+        label: 'Daily',
+        description: needsLogin
+          ? 'プレイするにはログインが必要です。'
+          : todayPlayed || dailyAlreadyPlayed
+          ? '今日は既に挑戦済みです。'
+          : dailyFetchError
+          ? 'デイリーチャレンジの取得に失敗しました。再度お試しください。'
+          : dailyFetching
+          ? 'デイリーチャレンジを取得中...'
+          : '今日のデイリーチャレンジです。全プレイヤーが1日1回だけ同じマップに挑戦できます。',
+        disabled: !needsLogin && (todayPlayed === true || dailyAlreadyPlayed || dailyFetching || dailyFetchError),
+        goLabel: needsLogin ? 'サインイン' : undefined,
+      },
+      {
+        key: 'seed',
+        label: 'Seed',
+        description: '指定したシード値のマップでプレイします。同じシードなら同じマップが再現されます。',
+        inputType: 'seed',
+        inputPlaceholder: 'シード値（数値）を入力',
+      },
+    ];
+  }, [session, sessionPending, todayPlayed, dailyAlreadyPlayed, dailyFetchError, dailyFetching]);
+
+  async function signInWithGoogle() {
+    const callbackURL = Platform.OS === 'web'
+      ? window.location.origin
+      : Linking.createURL('/');
+    await authClient.signIn.social({ provider: 'google', callbackURL });
+  }
 
   async function handlePlayGo(key: string, inputValue: string) {
+    // 未ログイン時はサインインフローへ
+    if (!session && (key === 'daily' || key === 'score')) {
+      await signInWithGoogle();
+      return;
+    }
     switch (key) {
       case 'daily': {
-        const date = getTodayDate();
-        setDailyLoading(true);
-        try {
-          const res = await fetch(`${DAILY_API}?date=${date}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = (await res.json()) as { date: string; seed: number };
-          await upsertDailySeed(data.date, data.seed);
-          setTodayPlayed(true);
-          setPlayModalVisible(false);
-          router.push({ pathname: '/game', params: { seed: String(data.seed) } });
-        } catch(e) {
-          console.log(e)
-          Alert.alert('エラー', 'デイリーチャレンジの取得に失敗しました。ネットワーク接続を確認してください。');
-        } finally {
-          setDailyLoading(false);
-        }
+        if (!dailySeedData) return;
+        setTodayPlayed(true);
+        setPlayModalVisible(false);
+        router.push({ pathname: '/game', params: { seed: String(dailySeedData.seed), date: dailySeedData.date, source: 'daily' } });
         break;
       }
       case 'tutorial':
@@ -119,6 +161,10 @@ export default function TopScreen() {
       case 'random':
         setPlayModalVisible(false);
         router.push('/game');
+        break;
+      case 'score':
+        setPlayModalVisible(false);
+        router.push({ pathname: '/game', params: { source: 'score' } });
         break;
       case 'seed': {
         const seed = parseInt(inputValue.trim(), 10);
@@ -202,7 +248,6 @@ export default function TopScreen() {
         onClose={() => setPlayModalVisible(false)}
         items={playItems}
         onGo={handlePlayGo}
-        goLoading={dailyLoading}
       />
 
       <LaunchModal
