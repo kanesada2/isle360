@@ -16,7 +16,7 @@ import { Colors, Spacing } from '@/constants/theme';
 
 const GAME_SCORE_API = __DEV__
   ? 'http://localhost:5173/api/game/score'
-  : 'https://isle.guts-kk-89.workers.dev/api/game/score';
+  : 'https://api.isle360.nosada.com/api/game/score';
 
 type Tab = 'daily' | 'alltime';
 

@@ -4,7 +4,9 @@ import { Alert } from 'react-native';
 
 import { GameScreen } from '@/components/game-screen';
 
-const GAME_START_API = 'https://isle.guts-kk-89.workers.dev/api/game/start';
+const GAME_START_API = __DEV__
+  ? 'http://localhost:5173/api/game/start'
+  : 'https://api.isle360.nosada.com/api/game/start';
 
 export default function GamePage() {
   const router = useRouter();

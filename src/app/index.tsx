@@ -19,7 +19,9 @@ import { decodeLogs } from '@/domain/log-codec';
 import { authClient } from '@/lib/auth-client';
 import { useSoundContext } from '@/sound';
 
-const DAILY_API = 'https://isle.guts-kk-89.workers.dev/api/daily/seed';
+const DAILY_API = __DEV__
+  ? 'http://localhost:5173/api/daily/seed'
+  : 'https://api.isle360.nosada.com/api/daily/seed';
 
 function getTodayDate(): string {
   const d = new Date();
@@ -51,14 +53,14 @@ export default function TopScreen() {
 
   const { data: session, isPending: sessionPending } = authClient.useSession();
 
-  // ログイン直後に name 未設定なら /account へ
+  // ログイン直後に/account へ
   const prevSessionRef = useRef<typeof session>(undefined);
   useEffect(() => {
     if (sessionPending) return;
     const prev = prevSessionRef.current;
     prevSessionRef.current = session;
     if (prev === undefined) return; // 初回レンダリングはスキップ
-    if (!prev && session && !session.user.name) {
+    if (!prev && session) {
       router.push('/account');
     }
   }, [session, sessionPending]);

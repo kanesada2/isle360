@@ -22,7 +22,8 @@ export const auth = (env: CloudflareBindings) =>  betterAuth({
     }, 
     trustedOrigins: [
         "isle360://",
-        "https://island-360.pages.dev",
+        "https://isle360.nosada.com",
+        "https://api.isle360.nosada.com",
         // DEV
         ...(import.meta.env.DEV ? [
             "exp://",

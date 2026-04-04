@@ -1,15 +1,15 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useColorScheme,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,7 +18,7 @@ import { authClient } from '@/lib/auth-client';
 
 const USER_NAME_API = __DEV__
   ? 'http://localhost:5173/api/user/name'
-  : 'https://isle.guts-kk-89.workers.dev/api/user/name';
+  : 'https://api.isle360.nosada.com/api/user/name';
 
 export default function AccountScreen() {
   const router = useRouter();

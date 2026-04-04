@@ -14,7 +14,16 @@
 		}
 	],
 	"vars": {
-		"BETTER_AUTH_URL": "https://isle.guts-kk-89.workers.dev",
-		"CROSS_SUBDOMAIN_COOKIES": "isle.guts-kk-89.workers.dev"
-	}
+		"BETTER_AUTH_URL": "https://api.isle360.nosada.com",
+		"CROSS_SUBDOMAIN_COOKIES": "isle360.nosada.com"
+	},
+	"routes": [
+		{
+			"pattern": "api.isle360.nosada.com",
+			"zone_name": "nosada.com",
+			"custom_domain": true
+		}
+	],
+	"workers_dev": true,
+	"preview_urls": true
 }

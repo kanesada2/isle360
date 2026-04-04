@@ -10,11 +10,11 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
 const GAME_SCORE_API = __DEV__
   ? 'http://localhost:5173/api/game/score'
-  : 'https://isle.guts-kk-89.workers.dev/api/game/score';
-import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
+  : 'https://api.isle360.nosada.com/api/game/score';
 
 import { Colors, Spacing } from '@/constants/theme';
 import type { ScoreBreakdown } from '@/domain/facility-actions';

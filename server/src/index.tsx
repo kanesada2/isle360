@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { uuidv7 } from 'uuidv7'
 import { env } from 'hono/adapter'
+import { uuidv7 } from 'uuidv7'
 import { db } from './database/db'
 import { games, scores, user } from './database/schema'
 import { auth } from './lib/auth'
@@ -18,9 +18,11 @@ app.use('*', corsMiddleware)
 
 app.use(renderer)
 
-app.on(["GET", "POST"], "/api/auth/*", (c) =>
-  auth(c.env).handler(c.req.raw),
-);
+app.on(["GET", "POST"], "/api/auth/*", (c) => {
+  console.log('cookies:', c.req.raw.headers.get('cookie'));
+  console.log('url:', c.req.url);
+  return auth(c.env).handler(c.req.raw);
+});
 
 app.get('/api/daily/seed', requireAuth, async (c) => {
   const now = Date.now();

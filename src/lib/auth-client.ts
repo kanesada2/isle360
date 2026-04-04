@@ -4,7 +4,7 @@ import * as SecureStore from "expo-secure-store";
 
 const BASE_URL = __DEV__
     ? "http://localhost:5173"
-    : "https://isle.guts-kk-89.workers.dev";
+    : "https://api.isle360.nosada.com";
 
 export const authClient = createAuthClient({
     baseURL: BASE_URL,

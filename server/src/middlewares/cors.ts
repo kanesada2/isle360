@@ -6,8 +6,8 @@ export const corsMiddleware = cors({
     }
     const ALLOWED_ORIGINS = [
         "http://localhost:5173",
-        "https://isle.guts-kk-89.workers.dev",
-        "https://island-360.pages.dev",
+        "https://api.isle360.nosada.com",
+        "https://isle360.nosada.com",
         "http://localhost:8081",
         "isle360://",
     ];
