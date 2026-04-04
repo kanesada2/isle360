@@ -76,8 +76,18 @@ app.get('/api/game/score', async (c) => {
   if (seed !== null && Number.isFinite(seed)) conditions.push(eq(scores.seed, seed));
 
   const rows = await db
-    .select()
+    .select({
+      id: scores.id,
+      userId: scores.userId,
+      userName: user.name,
+      seed: scores.seed,
+      score: scores.score,
+      log: scores.log,
+      date: scores.date,
+      createdAt: scores.createdAt,
+    })
     .from(scores)
+    .innerJoin(user, eq(scores.userId, user.id))
     .where(and(...conditions))
     .orderBy(desc(scores.score))
     .limit(20);

@@ -23,6 +23,7 @@ type Tab = 'daily' | 'alltime';
 type ScoreRow = {
   id: string;
   userId: string;
+  userName: string;
   seed: number;
   score: number;
   log: string;
@@ -137,7 +138,7 @@ export default function RankScreen() {
                   {index + 1}.
                 </Text>
                 <Text style={[styles.nameText, { color: colors.text }]} numberOfLines={1}>
-                  Dummy
+                  {item.userName}
                 </Text>
               </View>
 
