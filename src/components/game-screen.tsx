@@ -62,9 +62,13 @@ type Props = {
   onTutorialComplete?: () => void;
   /** 指定シードでマップを生成する（Play with seed 用） */
   initialMapSeed?: number;
+  /** スコア登録用ゲームID（score/dailyモード時のみ） */
+  gameId?: string | null;
+  /** デイリーチャレンジの日付（dailyモード時のみ） */
+  date?: string | null;
 };
 
-export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, initialMapSeed }: Props) {
+export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, initialMapSeed, gameId, date }: Props) {
   const isReplay = !!replayLogs;
   const isTutorial = !!tutorialStage;
   const router = useRouter();
@@ -644,6 +648,8 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
           agentLogs={isReplay ? undefined : agentResult?.logs}
           agentScore={isReplay ? undefined : agentResult?.score}
           mapSeed={game.mapSeed}
+          gameId={gameId}
+          date={date}
         />
       )}
       {/* 設定モーダル */}

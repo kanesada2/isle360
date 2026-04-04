@@ -10,6 +10,10 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+
+const GAME_SCORE_API = __DEV__
+  ? 'http://localhost:5173/api/game/score'
+  : 'https://isle.guts-kk-89.workers.dev/api/game/score';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { Colors, Spacing } from '@/constants/theme';
@@ -28,6 +32,8 @@ type Props = {
   agentLogs?: GameLogEntry[];
   agentScore?: number;
   mapSeed?: number;
+  gameId?: string | null;
+  date?: string | null;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -188,12 +194,16 @@ type ScoreTabProps = {
   logs: GameLogEntry[];
   colors: AppColors;
   mapSeed?: number;
+  gameId?: string | null;
+  date?: string | null;
 };
 
-function ScoreTab({ breakdown, logs, colors, mapSeed }: ScoreTabProps) {
+function ScoreTab({ breakdown, logs, colors, mapSeed, gameId, date }: ScoreTabProps) {
   const token = useMemo(() => encodeLogs(logs), [logs]);
   const [copied, setCopied] = useState(false);
   const [seedCopied, setSeedCopied] = useState(false);
+  const [scoreSubmitting, setScoreSubmitting] = useState(false);
+  const [scoreSubmitted, setScoreSubmitted] = useState(false);
 
   function handleCopy() {
     Clipboard.setStringAsync(token);
@@ -206,6 +216,24 @@ function ScoreTab({ breakdown, logs, colors, mapSeed }: ScoreTabProps) {
     Clipboard.setStringAsync(String(mapSeed));
     setSeedCopied(true);
     setTimeout(() => setSeedCopied(false), 2000);
+  }
+
+  async function handleScoreSubmit() {
+    if (!gameId || mapSeed === undefined || scoreSubmitting || scoreSubmitted) return;
+    setScoreSubmitting(true);
+    try {
+      const res = await fetch(GAME_SCORE_API, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, seed: mapSeed, score: breakdown.total, log: token, date: date ?? null }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setScoreSubmitted(true);
+    } catch {
+      // Alert is not imported here; use inline state for error
+      setScoreSubmitting(false);
+    }
   }
 
   return (
@@ -279,6 +307,28 @@ function ScoreTab({ breakdown, logs, colors, mapSeed }: ScoreTabProps) {
           />
         )}
       </ScrollView>
+
+      {gameId && (
+        <Pressable
+          disabled={scoreSubmitting || scoreSubmitted}
+          style={({ pressed }) => [
+            styles.submitButton,
+            {
+              backgroundColor: scoreSubmitted
+                ? colors.backgroundSelected
+                : pressed
+                ? colors.backgroundSelected
+                : colors.text,
+              opacity: scoreSubmitting ? 0.5 : 1,
+            },
+          ]}
+          onPress={handleScoreSubmit}
+        >
+          <Text style={[styles.submitButtonText, { color: scoreSubmitted ? colors.textSecondary : colors.background }]}>
+            {scoreSubmitted ? '登録済み' : scoreSubmitting ? '登録中...' : 'スコア登録'}
+          </Text>
+        </Pressable>
+      )}
     </>
   );
 }
@@ -393,7 +443,7 @@ function NpcTab({ agentLogs, agentScore, colors, onClose }: NpcTabProps) {
 
 const TAB_LABELS: Record<Tab, string> = { score: 'スコア', graph: 'グラフ', npc: 'NPCプレイ' };
 
-export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agentLogs, agentScore, mapSeed }: Props) {
+export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agentLogs, agentScore, mapSeed, gameId, date }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -427,7 +477,7 @@ export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agen
 
           {/* タブコンテンツ */}
           {activeTab === 'score'
-            ? <ScoreTab breakdown={breakdown} logs={logs} colors={colors} mapSeed={mapSeed} />
+            ? <ScoreTab breakdown={breakdown} logs={logs} colors={colors} mapSeed={mapSeed} gameId={gameId} date={date} />
             : activeTab === 'graph'
               ? <GraphTab logs={logs} colors={colors} />
               : <NpcTab agentLogs={agentLogs} agentScore={agentScore} colors={colors} onClose={onClose} />
@@ -604,6 +654,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   restartButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  submitButton: {
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+  },
+  submitButtonText: {
     fontSize: 15,
     fontWeight: '700',
   },

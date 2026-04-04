@@ -1,14 +1,20 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "isle",
-  "compatibility_date": "2025-08-03",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "./src/index.tsx",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "isle",
-      "database_id": "320b65f9-707b-40cf-9542-1938485478c1",
-    }
-  ]
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "isle",
+	"compatibility_date": "2025-08-03",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"main": "./src/index.tsx",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "isle",
+			"database_id": "320b65f9-707b-40cf-9542-1938485478c1",
+		}
+	],
+	"vars": {
+		"BETTER_AUTH_URL": "https://isle.guts-kk-89.workers.dev",
+		"CROSS_SUBDOMAIN_COOKIES": "isle.guts-kk-89.workers.dev"
+	}
 }

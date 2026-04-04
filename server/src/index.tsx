@@ -1,9 +1,9 @@
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { uuidv7 } from 'uuidv7'
 import { env } from 'hono/adapter'
 import { db } from './database/db'
-import { games } from './database/schema'
+import { games, scores, user } from './database/schema'
 import { auth } from './lib/auth'
 import { corsMiddleware } from './middlewares/cors'
 import { requireAuth, type AuthVariables } from './middlewares/require-auth'
@@ -64,6 +64,83 @@ app.post('/api/game/start', requireAuth, async (c) => {
   });
 
   return c.json({ id }, 201);
+})
+
+app.get('/api/game/score', async (c) => {
+  const date = c.req.query('date') ?? null;
+  const seedParam = c.req.query('seed');
+  const seed = seedParam !== undefined ? parseInt(seedParam, 10) : null;
+
+  const conditions = [isNull(scores.deletedAt)];
+  if (date !== null) conditions.push(eq(scores.date, date));
+  if (seed !== null && Number.isFinite(seed)) conditions.push(eq(scores.seed, seed));
+
+  const rows = await db
+    .select()
+    .from(scores)
+    .where(and(...conditions))
+    .orderBy(desc(scores.score))
+    .limit(20);
+
+  return c.json(rows);
+})
+
+app.post('/api/game/score', requireAuth, async (c) => {
+  const body = await c.req.json<{ gameId: string; seed: number; score: number; log: string; date: string | null }>();
+  const { gameId, seed, score, log, date } = body;
+
+  if (typeof seed !== 'number' || !Number.isFinite(seed)) {
+    return c.json({ error: 'Invalid seed' }, 400);
+  }
+  if (typeof score !== 'number' || !Number.isFinite(score)) {
+    return c.json({ error: 'Invalid score' }, 400);
+  }
+  if (typeof log !== 'string' || log.length === 0) {
+    return c.json({ error: 'Invalid log' }, 400);
+  }
+
+  const userId = c.get('userId');
+
+  const game = await db.query.games.findFirst({ where: eq(games.id, gameId) });
+  if (!game) {
+    return c.json({ error: 'Game not found' }, 400);
+  }
+  if (game.usedFlag) {
+    return c.json({ error: 'Game already used' }, 400);
+  }
+  const SESSION_DURATION_MS = 360_000;
+  if (Date.now() - game.createdAt.getTime() < SESSION_DURATION_MS) {
+    return c.json({ error: 'Game session not yet complete' }, 400);
+  }
+
+  const id = uuidv7();
+  await db.insert(scores).values({
+    id,
+    sessionId: gameId,
+    userId,
+    seed,
+    score,
+    log,
+    date: date ?? null,
+    createdAt: new Date(),
+  });
+  await db.update(games).set({ usedFlag: true }).where(eq(games.id, gameId));
+
+  return c.json({ id }, 201);
+})
+
+app.patch('/api/user/name', requireAuth, async (c) => {
+  const body = await c.req.json<{ name: string }>();
+  const { name } = body;
+
+  if (typeof name !== 'string' || name.trim().length === 0) {
+    return c.json({ error: 'Invalid name' }, 400);
+  }
+
+  const userId = c.get('userId');
+  await db.update(user).set({ name: name.trim(), updatedAt: new Date() }).where(eq(user.id, userId));
+
+  return c.json({ name: name.trim() });
 })
 
 export default app

@@ -57,5 +57,5 @@ export default function GamePage() {
 
   console.log('gameId', gameId); // TODO: スコア提出時に使用
 
-  return <GameScreen initialMapSeed={resolvedSeed.current} />;
+  return <GameScreen initialMapSeed={resolvedSeed.current} gameId={gameId} date={date ?? null} />;
 }

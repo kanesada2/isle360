@@ -1,6 +1,6 @@
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -50,6 +50,18 @@ export default function TopScreen() {
   useFocusEffect(useCallback(() => { playBgm('main'); }, [playBgm]));
 
   const { data: session, isPending: sessionPending } = authClient.useSession();
+
+  // ログイン直後に name 未設定なら /account へ
+  const prevSessionRef = useRef<typeof session>(undefined);
+  useEffect(() => {
+    if (sessionPending) return;
+    const prev = prevSessionRef.current;
+    prevSessionRef.current = session;
+    if (prev === undefined) return; // 初回レンダリングはスキップ
+    if (!prev && session && !session.user.name) {
+      router.push('/account');
+    }
+  }, [session, sessionPending]);
 
   const [playModalVisible, setPlayModalVisible] = useState(false);
   const [replayModalVisible, setReplayModalVisible] = useState(false);
@@ -226,6 +238,32 @@ export default function TopScreen() {
             onPress={() => setReplayModalVisible(true)}
           >
             <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Replay</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                borderColor: colors.text,
+                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
+              },
+            ]}
+            onPress={() => router.push('/rank')}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Rank</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                borderColor: colors.text,
+                backgroundColor: pressed ? colors.backgroundSelected : 'transparent',
+              },
+            ]}
+            onPress={() => router.push('/account')}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Account</Text>
           </Pressable>
 
           <Pressable
