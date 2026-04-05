@@ -103,7 +103,7 @@ export default function AccountScreen() {
               placeholderTextColor={colors.textSecondary}
               autoCorrect={false}
               autoCapitalize="none"
-              maxLength={32}
+              maxLength={16}
             />
 
             {error && (

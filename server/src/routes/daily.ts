@@ -7,11 +7,17 @@ import { findGameByUserAndDate } from '../repositories/game';
 const daily = new Hono<{ Bindings: CloudflareBindings; Variables: AuthVariables }>();
 
 daily.get('/seed', requireAuth, async (c) => {
-  const now = Date.now();
-  const maxDate = new Date(now + 14 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const requested = c.req.query('date') ?? maxDate;
+  const maxDate = new Date(Date.now() + 14 * 60 * 60 * 1000);
+  const maxDateStr = maxDate.toISOString().slice(0, 10);
+  const requestedStr = c.req.query('date') ?? maxDateStr;
 
-  if (requested > maxDate) {
+  const requestedDate = new Date(requestedStr);
+  if (isNaN(requestedDate.getTime())) {
+    return c.json({ error: 'Invalid date' }, 400);
+  }
+
+  const requested = requestedDate.toISOString().slice(0, 10);
+  if (requestedDate > new Date(maxDateStr)) {
     return c.json({ error: 'Not yet available' }, 400);
   }
 
