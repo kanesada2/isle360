@@ -1,15 +1,15 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-    useColorScheme,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,11 +32,13 @@ export default function AccountScreen() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const displayName = (session?.user as { displayName?: string })?.displayName ?? '';
+
   useEffect(() => {
-    if (session?.user.name) {
-      setName(session.user.name);
+    if (displayName) {
+      setName(displayName);
     }
-  }, [session?.user.name]);
+  }, [displayName]);
 
   async function handleSave() {
     if (saving || name.trim().length === 0) return;
@@ -60,7 +62,7 @@ export default function AccountScreen() {
     }
   }
 
-  const isDirty = name.trim() !== (session?.user.name ?? '');
+  const isDirty = name.trim() !== displayName;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -127,11 +129,6 @@ export default function AccountScreen() {
                 </Text>
               )}
             </Pressable>
-
-            <View style={[styles.divider, { backgroundColor: colors.backgroundSelected }]} />
-
-            <Text style={[styles.emailLabel, { color: colors.textSecondary }]}>メールアドレス</Text>
-            <Text style={[styles.emailValue, { color: colors.text }]}>{session.user.email}</Text>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -199,15 +196,5 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 15,
     fontWeight: '700',
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-  },
-  emailLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  emailValue: {
-    fontSize: 15,
   },
 });

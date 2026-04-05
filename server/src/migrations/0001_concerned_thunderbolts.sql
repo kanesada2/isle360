@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `display_name` text DEFAULT 'NoName' NOT NULL;

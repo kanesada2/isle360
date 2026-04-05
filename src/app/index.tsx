@@ -1,6 +1,6 @@
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -52,18 +52,6 @@ export default function TopScreen() {
   useFocusEffect(useCallback(() => { playBgm('main'); }, [playBgm]));
 
   const { data: session, isPending: sessionPending } = authClient.useSession();
-
-  // ログイン直後に/account へ
-  const prevSessionRef = useRef<typeof session>(undefined);
-  useEffect(() => {
-    if (sessionPending) return;
-    const prev = prevSessionRef.current;
-    prevSessionRef.current = session;
-    if (prev === undefined) return; // 初回レンダリングはスキップ
-    if (!prev && session) {
-      router.push('/account');
-    }
-  }, [session, sessionPending]);
 
   const [playModalVisible, setPlayModalVisible] = useState(false);
   const [replayModalVisible, setReplayModalVisible] = useState(false);
@@ -149,8 +137,8 @@ export default function TopScreen() {
 
   async function signInWithGoogle() {
     const callbackURL = Platform.OS === 'web'
-      ? window.location.origin
-      : Linking.createURL('/');
+      ? `${window.location.origin}/account`
+      : Linking.createURL('/account');
     await authClient.signIn.social({ provider: 'google', callbackURL });
   }
 

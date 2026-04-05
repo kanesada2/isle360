@@ -81,7 +81,7 @@ app.get('/api/game/score', async (c) => {
     .select({
       id: scores.id,
       userId: scores.userId,
-      userName: user.name,
+      userName: user.displayName,
       seed: scores.seed,
       score: scores.score,
       log: scores.log,
@@ -150,9 +150,9 @@ app.patch('/api/user/name', requireAuth, async (c) => {
   }
 
   const userId = c.get('userId');
-  await db.update(user).set({ name: name.trim(), updatedAt: new Date() }).where(eq(user.id, userId));
+  await db.update(user).set({ displayName: name.trim(), updatedAt: new Date() }).where(eq(user.id, userId));
 
-  return c.json({ name: name.trim() });
+  return c.json({ displayName: name.trim() });
 })
 
 export default app

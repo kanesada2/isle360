@@ -17,9 +17,19 @@ export const auth = (env: CloudflareBindings) =>  betterAuth({
         },*/
     },
     plugins: [expo()],
-    emailAndPassword: { 
+    emailAndPassword: {
         enabled: false,
-    }, 
+    },
+    user: {
+        additionalFields: {
+            displayName: {
+                type: "string",
+                required: false,
+                defaultValue: "NoName",
+                fieldName: "display_name",
+            }
+        }
+    },
     trustedOrigins: [
         "isle360://",
         "https://isle360.nosada.com",

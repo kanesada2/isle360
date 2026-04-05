@@ -111,9 +111,13 @@ export default function RankScreen() {
       {/* カラムヘッダー */}
       <View style={[styles.columnHeader, { borderBottomColor: colors.backgroundSelected }]}>
         <Text style={[styles.colName, { color: colors.textSecondary }]}>NAME</Text>
-        <Text style={[styles.colSeed, { color: colors.textSecondary }]}>SEED</Text>
+        {activeTab === 'alltime' && (
+          <Text style={[styles.colSeed, { color: colors.textSecondary }]}>SEED</Text>
+        )}
         <Text style={[styles.colScore, { color: colors.textSecondary }]}>SCORE</Text>
-        <Text style={[styles.colReplay, { color: colors.textSecondary }]}>REPLAY</Text>
+        {activeTab === 'alltime' && (
+          <Text style={[styles.colReplay, { color: colors.textSecondary }]}>REPLAY</Text>
+        )}
       </View>
 
       {loading ? (
@@ -142,31 +146,35 @@ export default function RankScreen() {
                 </Text>
               </View>
 
-              {/* Seed（タップでコピー） */}
-              <Pressable
-                style={[styles.seedCell, { backgroundColor: colors.backgroundElement, borderRadius: Spacing.one }]}
-                onPress={() => handleCopySeed(item)}
-              >
-                <Text style={[styles.seedText, { color: copiedId === item.id ? colors.textSecondary : colors.text }]}>
-                  {copiedId === item.id ? 'Copied' : item.seed}
-                </Text>
-              </Pressable>
+              {/* Seed（タップでコピー） - alltime のみ */}
+              {activeTab === 'alltime' && (
+                <Pressable
+                  style={[styles.seedCell, { backgroundColor: colors.backgroundElement, borderRadius: Spacing.one }]}
+                  onPress={() => handleCopySeed(item)}
+                >
+                  <Text style={[styles.seedText, { color: copiedId === item.id ? colors.textSecondary : colors.text }]}>
+                    {copiedId === item.id ? 'Copied' : item.seed}
+                  </Text>
+                </Pressable>
+              )}
 
               {/* Score */}
               <Text style={[styles.scoreText, { color: colors.text }]}>
                 {item.score.toLocaleString()}
               </Text>
 
-              {/* Replay ボタン */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.replayButton,
-                  { backgroundColor: pressed ? colors.backgroundSelected : colors.backgroundElement },
-                ]}
-                onPress={() => handleReplay(item)}
-              >
-                <Text style={[styles.replayLabel, { color: colors.text }]}>GO</Text>
-              </Pressable>
+              {/* Replay ボタン - alltime のみ */}
+              {activeTab === 'alltime' && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.replayButton,
+                    { backgroundColor: pressed ? colors.backgroundSelected : colors.backgroundElement },
+                  ]}
+                  onPress={() => handleReplay(item)}
+                >
+                  <Text style={[styles.replayLabel, { color: colors.text }]}>GO</Text>
+                </Pressable>
+              )}
             </View>
           )}
         />
@@ -245,14 +253,14 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   colName: {
-    width: 72,
+    width: 96,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
     overflow: 'hidden',
   },
   colSeed: {
-    width: 72,
+    width: 96,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -275,7 +283,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   seedCell: {
-    width: 72,
+    width: 96,
     paddingHorizontal: Spacing.one,
     paddingVertical: 2,
   },
