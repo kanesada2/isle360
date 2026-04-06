@@ -4,6 +4,8 @@ import { uuidv7 } from 'uuidv7';
 import { generateDailySeed } from '../lib/daily-seed';
 import { requireAuth, type AuthVariables } from '../middlewares/require-auth';
 import { createGame, createScore, findGameById, findScores, markGameUsed } from '../repositories/game';
+import { decodeLogs } from '../../../src/domain/log-codec';
+import { scoreFromLogs } from '../../../src/domain/replay-simulator';
 
 const SESSION_DURATION_MS = 360_000;
 
@@ -54,6 +56,21 @@ game.post('/score', requireAuth, async (c) => {
   }
   if (typeof log !== 'string' || log.length === 0) {
     return c.json({ error: 'Invalid log' }, 400);
+  }
+
+  // リプレイシミュレータでスコアを再現し、送信値と照合する
+  let replayTotal: number;
+  let decodedLogs: ReturnType<typeof decodeLogs>;
+  try {
+    decodedLogs = decodeLogs(log);
+    replayTotal = scoreFromLogs(decodedLogs).total;
+  } catch {
+    return c.json({ error: 'Invalid log' }, 400);
+  }
+  if (replayTotal !== score) {
+    console.log(`[score-mismatch] userId=${c.get('userId')} seed=${seed} submitted=${score} replay=${replayTotal}`);
+    console.log(`[score-mismatch] logs=${JSON.stringify(decodedLogs)}`);
+    return c.json({ error: 'Score mismatch' }, 400);
   }
 
   const userId = c.get('userId');

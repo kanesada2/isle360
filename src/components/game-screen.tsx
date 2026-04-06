@@ -6,6 +6,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { runOnJS } from 'react-native-worklets';
 
+import { runAgent } from '@/agent/simulator';
 import { BuildModal } from '@/components/build-modal';
 import { FacilityDetailModal } from '@/components/facility-detail-modal';
 import { MissionBar } from '@/components/mission-bar';
@@ -19,9 +20,7 @@ import { TimerBar } from '@/components/timer-bar';
 import { TutorialCompleteModal } from '@/components/tutorial-complete-modal';
 import { TutorialHintModal } from '@/components/tutorial-hint-modal';
 import { Colors, Spacing } from '@/constants/theme';
-import { useSoundContext } from '@/sound';
 import { insertPlayLog } from '@/db/local';
-import { encodeLogs } from '@/domain/log-codec';
 import {
   applyReplayEvent,
   buildFacility,
@@ -36,15 +35,17 @@ import {
 } from '@/domain/facility-actions';
 import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
 import { createGame } from '@/domain/game';
-import { runAgent } from '@/agent/simulator';
+import { encodeLogs } from '@/domain/log-codec';
+import { scoreFromLogs } from '@/domain/replay-simulator';
 import type { ResearchCatalogEntry } from '@/domain/research-catalog';
 import { getUnlockedPhases } from '@/domain/research-unlock';
 import type { TutorialStage } from '@/domain/tutorial';
 import { createTutorialGame } from '@/domain/tutorial';
-import type { Game, GameLogEntry, PlotIndex, ResearchId, ResourcePhase } from '@/domain/types';
+import type { Game, GameLogEntry, PlotIndex, ResourcePhase } from '@/domain/types';
 import { useGameLoop } from '@/hooks/use-game-loop';
 import { useMissions } from '@/hooks/use-missions';
 import { usePlotTriggers } from '@/hooks/use-plot-triggers';
+import { useSoundContext } from '@/sound';
 
 const SESSION_DURATION_MS = 360_000;
 const INITIAL_FUNDS = 1_000;
@@ -220,7 +221,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
             Date.now(),
           );
           const finalGame = runAgent(agentGame);
-          setAgentResult({ logs: finalGame.logs, score: computeScore(finalGame).total });
+          setAgentResult({ logs: finalGame.logs, score: scoreFromLogs(finalGame.logs).total });
         }, 0);
       }
     }
@@ -252,7 +253,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
   }, [isTutorial, gameFinished, currentMission]);
 
   const scoreBreakdown = useMemo(
-    () => computeScore(game),
+    () => scoreFromLogs(game.logs),
     [gameFinished], // eslint-disable-line react-hooks/exhaustive-deps
   );
 

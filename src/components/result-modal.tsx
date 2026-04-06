@@ -2,6 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -21,7 +22,7 @@ import type { ScoreBreakdown } from '@/domain/facility-actions';
 import { encodeLogs } from '@/domain/log-codec';
 import type { GameLogEntry } from '@/domain/types';
 
-type Tab = 'score' | 'graph' | 'npc';
+type Tab = 'score' | 'graph' | 'npc'
 
 type Props = {
   visible: boolean;
@@ -228,10 +229,17 @@ function ScoreTab({ breakdown, logs, colors, mapSeed, gameId, date }: ScoreTabPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gameId, seed: mapSeed, score: breakdown.total, log: token, date: date ?? null }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({} as { error?: string }));
+        if (data.error === 'Score mismatch') {
+          Alert.alert('スコア登録失敗', 'スコアの検証に失敗したため、このプレイは登録できませんでした。');
+        } else {
+          setScoreSubmitting(false);
+        }
+        return;
+      }
       setScoreSubmitted(true);
     } catch {
-      // Alert is not imported here; use inline state for error
       setScoreSubmitting(false);
     }
   }
@@ -441,7 +449,7 @@ function NpcTab({ agentLogs, agentScore, colors, onClose }: NpcTabProps) {
 
 // ── ResultModal ───────────────────────────────────────────────
 
-const TAB_LABELS: Record<Tab, string> = { score: 'スコア', graph: 'グラフ', npc: 'NPCプレイ' };
+const TAB_LABELS: Record<Tab, string> = { score: 'スコア', graph: 'グラフ', npc: 'NPCプレイ'};
 
 export function ResultModal({ visible, breakdown, onRestart, onClose, logs, agentLogs, agentScore, mapSeed, gameId, date }: Props) {
   const colorScheme = useColorScheme();
