@@ -654,11 +654,11 @@ describe("鉱物活用建築", () => {
     expect(g.player.funds).toBe(10_000 - AGRI_ENTRY.buildCost);
   });
 
-  it("alternative-building Lv1 で mineral_abundance × 0.0004 の割引が適用される", () => {
+  it("alternative-building Lv1 で mineral_abundance × 0.0005 の割引が適用される", () => {
     // mineral abundance=1000 → 割引率 = 1000 × 0.0004 = 0.4 (40%)
     const game = makeGameWithMineral(1000, 10_000, research(["alternative-building", 1]));
     const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
-    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.4));
+    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.5));
     expect(g.player.funds).toBe(10_000 - expectedCost);
   });
 
@@ -666,7 +666,7 @@ describe("鉱物活用建築", () => {
     // abundance=200 → 割引率 = 200 × 0.0004 = 0.08 (8%)
     const game = makeGameWithMineral(200, 10_000, research(["alternative-building", 1]));
     const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
-    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.08));
+    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.1));
     expect(g.player.funds).toBe(10_000 - expectedCost);
   });
 
@@ -674,7 +674,7 @@ describe("鉱物活用建築", () => {
     // abundance=1000, effLv=1 → 割引率 = 1000 × 0.0004 × 1.2 = 0.48 (48%)
     const game = makeGameWithMineral(1000, 10_000, research(["alternative-building", 1], ["alternativity-efficiency", 1]));
     const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
-    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.48));
+    const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - 0.6));
     expect(g.player.funds).toBe(10_000 - expectedCost);
   });
 
@@ -682,7 +682,7 @@ describe("鉱物活用建築", () => {
     // abundance=1000, effLv=2 → 割引率 = 1000 × 0.0004 × 1.44 = 0.576 (57.6%)
     const game = makeGameWithMineral(1000, 10_000, research(["alternative-building", 1], ["alternativity-efficiency", 2]));
     const g = buildFacility(game, 0, AGRI_ENTRY, NOW);
-    const rate = 1000 * 0.0004 * Math.pow(1.2, 2);
+    const rate = 1000 * 0.0005 * Math.pow(1.2, 2);
     const expectedCost = Math.round(AGRI_ENTRY.buildCost * (1 - rate));
     expect(g.player.funds).toBe(10_000 - expectedCost);
   });
@@ -903,12 +903,12 @@ describe("ゲームログ", () => {
 
   it("computeFundsPerSecond: agri-patent 完了で +10 G/s", () => {
     const game = makeGame(10_000, research(["agri-patent", 1]));
-    expect(computeFundsPerSecond(game)).toBe(10);
+    expect(computeFundsPerSecond(game)).toBe(20);
   });
 
-  it("computeFundsPerSecond: patent 2種完了で +20 G/s", () => {
+  it("computeFundsPerSecond: patent 2種完了で +40 G/s", () => {
     const game = makeGame(10_000, research(["agri-patent", 1], ["mineral-patent", 1]));
-    expect(computeFundsPerSecond(game)).toBe(20);
+    expect(computeFundsPerSecond(game)).toBe(40);
   });
 });
 
@@ -927,18 +927,18 @@ describe("特許収入", () => {
     expect(after.player.patentTickAt).toBe(NOW + 1_000);
   });
 
-  it("agri-patent 完了後、2回目 tick で 10G/s × 経過秒分が加算される", () => {
+  it("agri-patent 完了後、2回目 tick で 20G/s × 経過秒分が加算される", () => {
     const game = makeGame(1_000, research(["agri-patent", 1]));
     const tick1 = tickFacilities(game, NOW + 1_000);
     const tick2 = tickFacilities(tick1, NOW + 2_000); // 1秒経過
-    expect(tick2.player.funds).toBeCloseTo(1_010, 1);
+    expect(tick2.player.funds).toBeCloseTo(1_020, 1);
   });
 
-  it("patent 3種完了で 30G/s", () => {
+  it("patent 3種完了で 60G/s", () => {
     const game = makeGame(1_000, research(["agri-patent", 1], ["mineral-patent", 1], ["energy-patent", 1]));
     const tick1 = tickFacilities(game, NOW);
     const tick2 = tickFacilities(tick1, NOW + 1_000); // 1秒経過
-    expect(tick2.player.funds).toBeCloseTo(1_030, 1);
+    expect(tick2.player.funds).toBeCloseTo(1_060, 1);
   });
 
   it("patent なしでは tickFacilities が同一参照を返す", () => {

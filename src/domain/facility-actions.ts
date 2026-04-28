@@ -29,7 +29,7 @@ const PATENT_KEYS: ResearchId[] = [
   r('agri-patent'), r('mineral-patent'), r('energy-patent'),
   r('refinery-patent'), r('construction-patent'), r('regen-patent'), r('alternativity-patent'),
 ];
-export const PATENT_FUNDS_PER_SEC = 10;
+export const PATENT_FUNDS_PER_SEC = 20;
 
 /** 完了済み特許の数を返す */
 function countCompletedPatents(completedResearch: Map<ResearchId, number>): number {
@@ -120,7 +120,7 @@ export function getMineralBuildDiscountRate(
   const mineralDeposit = plots[plotIndex].deposits.find((d) => d.type === 'mineral');
   if (!mineralDeposit) return 0;
   const effLevel = completedResearch.get(ALTERNATIVITY_EFFICIENCY_KEY) ?? 0;
-  return Math.min(1, mineralDeposit.abundance * 0.0004 * Math.pow(1.2, effLevel));
+  return Math.min(1, mineralDeposit.abundance * 0.0005 * Math.pow(1.2, effLevel));
 }
 
 /**
