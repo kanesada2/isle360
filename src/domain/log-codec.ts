@@ -9,6 +9,7 @@ const KIND_LIST: GameEventKind[] = [
   'construction-start',
   'construction-complete',
   'demolish-start',
+  'demolish-complete',
   'research-start',
   'research-complete',
 ];

@@ -276,7 +276,7 @@ export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number):
 
   const facility = game.facilities.get(facilityId);
   if (!facility) return game;
-  if (facility.state !== 'idle') return game;
+  if (facility.state !== 'idle' && facility.state !== 'stopped') return game;
 
   const newFacilities = new Map(game.facilities);
   newFacilities.set(facilityId, {
