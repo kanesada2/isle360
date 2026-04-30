@@ -248,6 +248,7 @@ export function buildFacility(
   );
   const discountRate = getMineralBuildDiscountRate(plotIndex, game.plots, game.player.completedResearch);
   const actualCost = getActualBuildCost(entry, discountRate);
+  if (game.player.funds < actualCost) return game;
   const newPlayer = {
     ...game.player,
     funds: game.player.funds - actualCost,
@@ -277,6 +278,7 @@ export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number):
     state: 'demolishing' as const,
     currentJob: { startedAt: now, durationMs: Math.round(DEMOLISH_DURATION_MS * getConstructionMultiplier(game.player.completedResearch)) },
   });
+  if (game.player.funds < facility.demolishCost) return game;
   const newActiveResearchIds = new Set(game.player.activeResearchIds);
   if (facility.kind === 'laboratory' && facility.activeResearchId) {
     newActiveResearchIds.delete(facility.activeResearchId);

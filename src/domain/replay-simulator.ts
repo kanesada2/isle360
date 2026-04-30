@@ -35,6 +35,18 @@ export function simulateReplay(logs: GameLogEntry[]): Game {
       e.kind === 'research-start',
   );
 
+  // elapsedMs が非減少順かつセッション範囲内であることを検証
+  let lastElapsedMs = -1;
+  for (const ev of dispatchableEvents) {
+    if (ev.elapsedMs < 0 || ev.elapsedMs > SESSION_DURATION_MS) {
+      throw new Error('Event elapsedMs out of range');
+    }
+    if (ev.elapsedMs < lastElapsedMs) {
+      throw new Error('Events not in chronological order');
+    }
+    lastElapsedMs = ev.elapsedMs;
+  }
+
   let eventIndex = 0;
 
   // SUBTICK_MS 刻みで SESSION_DURATION_MS まで tick を回す
