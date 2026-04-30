@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Pressable,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,6 +36,8 @@ type Props = {
   onAction: () => void;
   onDemolish?: () => void;
   demolishDisabled?: boolean;
+  demolishCost?: number;
+  demolishLabel?: string;
   actionForceDisabled?: boolean;
 };
 
@@ -51,6 +53,8 @@ export function CatalogModal({
   onAction,
   onDemolish,
   demolishDisabled = false,
+  demolishCost,
+  demolishLabel = '破壊',
   actionForceDisabled = false,
 }: Props) {
   const colorScheme = useColorScheme();
@@ -157,7 +161,7 @@ export function CatalogModal({
             confirming ? (
               <View style={[styles.confirmBox, { backgroundColor: colors.background }]}>
                 <Text style={[styles.confirmText, { color: colors.textSecondary }]}>
-                  本当に破壊しますか？（10秒）
+                  本当に{demolishLabel}しますか？{demolishCost !== undefined ? `（10秒、${demolishCost.toLocaleString()} G）` : '（10秒）'}
                 </Text>
                 <View style={styles.confirmButtons}>
                   <Pressable
@@ -170,7 +174,7 @@ export function CatalogModal({
                     style={({ pressed }) => [styles.confirmBtn, { backgroundColor: pressed ? '#c62828' : '#F44336' }]}
                     onPress={() => { setConfirming(false); onDemolish(); }}
                   >
-                    <Text style={[styles.confirmBtnText, { color: '#ffffff' }]}>破壊する</Text>
+                    <Text style={[styles.confirmBtnText, { color: '#ffffff' }]}>{demolishLabel}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -186,7 +190,7 @@ export function CatalogModal({
                 ]}
                 onPress={() => setConfirming(true)}
               >
-                <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>破壊する</Text>
+                <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>{demolishLabel}</Text>
               </Pressable>
             )
           )}

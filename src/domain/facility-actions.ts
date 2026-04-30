@@ -2,7 +2,7 @@ import type { FacilityCatalogEntry } from './facility-catalog';
 import { FACILITY_CATALOG, getActualBuildCost } from './facility-catalog';
 import { newFacilityId } from './id';
 import { RESEARCH_CATALOG, getResearchCost, type ResearchCatalogEntry } from './research-catalog';
-import type { Extractor, Facility, FacilityId, Game, GameLogEntry, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType } from './types';
+import type { Extractor, Facility, FacilityId, Game, GameLogEntry, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType, Subdivision } from './types';
 export { getResearchCost } from './research-catalog';
 
 export const BUILD_DURATION_MS = 20_000;
@@ -236,6 +236,9 @@ export function buildFacility(
     case 'monument':
       facility = { ...base, kind: 'monument' } as Monument;
       break;
+    case 'subdivision':
+      facility = { ...base, kind: 'subdivision', lastDrainAt: null } as Subdivision;
+      break;
   }
 
   const newFacilities = new Map(game.facilities);
@@ -316,6 +319,12 @@ export function tickFacilities(game: Game, now: number): Game {
           // Extractor は完了と同時に採掘タイマーを開始
           if (facility.kind === 'extractor') {
             newFacilities.set(id, { ...facility, state: 'idle' as const, currentJob: null, lastCycleAt: now });
+          } else if (facility.kind === 'subdivision') {
+            // 建設完了時に建設マスの資源総量分の資金を即時付与
+            const plot = newPlots[facility.plotIndex];
+            const totalResources = plot.deposits.reduce((sum, d) => sum + d.current, 0);
+            newPlayer = { ...newPlayer, funds: Math.round((newPlayer.funds + Math.floor(totalResources)) * 100) / 100 };
+            newFacilities.set(id, { ...facility, state: 'idle' as const, currentJob: null, lastDrainAt: null } as Subdivision);
           } else {
             newFacilities.set(id, { ...facility, state: 'idle' as const, currentJob: null });
           }
@@ -361,6 +370,30 @@ export function tickFacilities(game: Game, now: number): Game {
       const deposit = newPlots[facility.plotIndex].deposits.find(d => d.type === (facility as Extractor).resourceType);
       if (deposit && deposit.current > 0) {
         newFacilities.set(id, { ...(facility as Extractor), state: 'idle' as const, lastCycleAt: now });
+        changed = true;
+      }
+      continue;
+    }
+
+    // ── Subdivision: 全資源を 0.5秒ごとに 1 ずつドレイン ────────────
+    if (facility.kind === 'subdivision' && facility.state === 'idle') {
+      const sub = facility as Subdivision;
+      if (sub.lastDrainAt === null) {
+        newFacilities.set(id, { ...sub, lastDrainAt: now });
+        changed = true;
+        continue;
+      }
+      const drainCycles = Math.floor((now - sub.lastDrainAt) / 500);
+      if (drainCycles > 0) {
+        const pi = sub.plotIndex;
+        const plot = newPlots[pi];
+        const newDeposits = plot.deposits.map((deposit) => {
+          const reduction = Math.min(deposit.current, drainCycles);
+          if (reduction === 0) return deposit;
+          return { ...deposit, current: Math.round((deposit.current - reduction) * 100) / 100 };
+        });
+        newPlots = newPlots.map((p, i) => i === pi ? { ...p, deposits: newDeposits } : p);
+        newFacilities.set(id, { ...sub, lastDrainAt: sub.lastDrainAt + drainCycles * 500 });
         changed = true;
       }
       continue;

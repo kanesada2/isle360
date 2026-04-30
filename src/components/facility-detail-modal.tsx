@@ -11,9 +11,11 @@ type Props = {
   rows: FacilityDetailRow[];
   onDemolish?: () => void;
   demolishDisabled?: boolean;
+  demolishCost?: number;
+  demolishLabel?: string;
 };
 
-export function FacilityDetailModal({ visible, onClose, title, rows, onDemolish, demolishDisabled = false }: Props) {
+export function FacilityDetailModal({ visible, onClose, title, rows, onDemolish, demolishDisabled = false, demolishCost, demolishLabel = '破壊する' }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
@@ -49,7 +51,7 @@ export function FacilityDetailModal({ visible, onClose, title, rows, onDemolish,
             confirming ? (
               <View style={[styles.confirmBox, { backgroundColor: colors.background }]}>
                 <Text style={[styles.confirmText, { color: colors.textSecondary }]}>
-                  本当に破壊しますか？（10秒）
+                  本当に{demolishLabel}しますか？{demolishCost !== undefined ? `（10秒、${demolishCost.toLocaleString()} G）` : '（10秒）'}
                 </Text>
                 <View style={styles.confirmButtons}>
                   <Pressable
@@ -62,7 +64,7 @@ export function FacilityDetailModal({ visible, onClose, title, rows, onDemolish,
                     style={({ pressed }) => [styles.confirmBtn, { backgroundColor: pressed ? '#c62828' : '#F44336' }]}
                     onPress={() => { setConfirming(false); onDemolish(); }}
                   >
-                    <Text style={[styles.confirmBtnText, { color: '#ffffff' }]}>破壊する</Text>
+                    <Text style={[styles.confirmBtnText, { color: '#ffffff' }]}>{demolishLabel}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -79,7 +81,7 @@ export function FacilityDetailModal({ visible, onClose, title, rows, onDemolish,
                 ]}
                 onPress={() => setConfirming(true)}
               >
-                <Text style={[styles.closeButtonText, { color: '#ffffff' }]}>破壊する</Text>
+                <Text style={[styles.closeButtonText, { color: '#ffffff' }]}>{demolishLabel}</Text>
               </Pressable>
             )
           )}

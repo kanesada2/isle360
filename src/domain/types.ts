@@ -75,7 +75,13 @@ export type Monument = FacilityBase & {
   kind: "monument";
 };
 
-export type Facility = Extractor | Refinery | Laboratory | Monument;
+// Subdivision: 開発区画（建設完了時に資源総量分を即時取得、稼働中は全資源を徐々に消費）
+export type Subdivision = FacilityBase & {
+  kind: "subdivision";
+  lastDrainAt: number | null;
+};
+
+export type Facility = Extractor | Refinery | Laboratory | Monument | Subdivision;
 
 // ── Player ───────────────────────────────────────────────────────
 export type Player = {

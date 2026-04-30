@@ -1095,3 +1095,114 @@ describe("停止中 (stopped) Extractor", () => {
     expect([...game.facilities.values()][0].state).toBe("stopped");
   });
 });
+
+// ── Subdivision（開発区画）────────────────────────────────────
+
+const SUBDIVISION_ENTRY = FACILITY_CATALOG.find((e) => e.key === "subdivision")!;
+
+describe("Subdivision 建設", () => {
+  it("建設コスト 0G で constructing 状態になる", () => {
+    const game0 = makeGame(500);
+    const game = buildFacility(game0, 0, SUBDIVISION_ENTRY, NOW);
+
+    expect(game.player.funds).toBe(500);
+    const fac = [...game.facilities.values()][0];
+    expect(fac.state).toBe("constructing");
+    expect(fac.kind).toBe("subdivision");
+  });
+
+  it("BUILD_DURATION_MS 後に完了し、建設マスの資源総量分の資金を即時獲得する", () => {
+    const game0 = makeGame(0);
+    // makeGame の plot 0: 農産1000 + 鉱物500 + エネルギー300 = 1800
+    const plotTotalResources = game0.plots[0].deposits.reduce((s, d) => s + d.current, 0);
+
+    let game = buildFacility(game0, 0, SUBDIVISION_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+
+    const fac = [...game.facilities.values()][0];
+    expect(fac.state).toBe("idle");
+    expect(fac.kind).toBe("subdivision");
+    expect(game.player.funds).toBe(Math.floor(plotTotalResources));
+  });
+
+  it("建設マスのみ参照し、他マスの資源は含まない", () => {
+    const game0 = makeGame(0);
+    // plot 0 の農産資源を半分に減らす（他マスは変えない）
+    const game1 = {
+      ...game0,
+      plots: game0.plots.map((p, i) =>
+        i === 0 ? { ...p, deposits: p.deposits.map((d) => (d.type === "agriculture" ? { ...d, current: 500 } : d)) } : p,
+      ),
+    };
+    const plot0Total = game1.plots[0].deposits.reduce((s, d) => s + d.current, 0);
+
+    let game = buildFacility(game1, 0, SUBDIVISION_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+
+    expect(game.player.funds).toBe(Math.floor(plot0Total));
+  });
+});
+
+describe("Subdivision ドレイン", () => {
+  it("完了後 0.5 秒で建設マスの全資源が 1 ずつ減少し、他マスは変化しない", () => {
+    let game = makeGame(0);
+    game = buildFacility(game, 0, SUBDIVISION_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);        // 完了 → lastDrainAt=null
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 1);    // lastDrainAt セット
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 501);  // 1サイクル経過
+
+    // plot 0 だけ 1 ずつ減る
+    for (const deposit of game.plots[0].deposits) {
+      expect(deposit.current).toBe(deposit.abundance - 1);
+    }
+    // 他のプロットは変化なし
+    for (let i = 1; i < game.plots.length; i++) {
+      for (const deposit of game.plots[i].deposits) {
+        expect(deposit.current).toBe(deposit.abundance);
+      }
+    }
+  });
+
+  it("1.5 秒後には建設マスの資源が 3 ずつ減少する", () => {
+    let game = makeGame(0);
+    game = buildFacility(game, 0, SUBDIVISION_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 1);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 1_501);
+
+    for (const deposit of game.plots[0].deposits) {
+      expect(deposit.current).toBe(deposit.abundance - 3);
+    }
+  });
+
+  it("資源が 0 になっても負にならない", () => {
+    let game = makeGame(0);
+    // plot 0 の全資源を残量 1 にする
+    game = {
+      ...game,
+      plots: game.plots.map((p, i) =>
+        i === 0 ? { ...p, deposits: p.deposits.map((d) => ({ ...d, current: 1 })) } : p,
+      ),
+    };
+    game = buildFacility(game, 0, SUBDIVISION_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 1);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS + 2_501);
+
+    for (const deposit of game.plots[0].deposits) {
+      expect(deposit.current).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("buildFacility 未完了（constructing 中）はドレインしない", () => {
+    const game0 = makeGame(0);
+    let game = buildFacility(game0, 0, SUBDIVISION_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS - 1); // まだ完了しない
+
+    for (const plot of game.plots) {
+      for (const deposit of plot.deposits) {
+        expect(deposit.current).toBe(deposit.abundance);
+      }
+    }
+  });
+});

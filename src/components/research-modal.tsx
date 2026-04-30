@@ -16,11 +16,12 @@ type Props = {
   funds: number;
   onDemolish?: () => void;
   demolishDisabled?: boolean;
+  demolishCost?: number;
   labProcessing?: boolean;
   actionDisabled?: boolean;
 };
 
-export function ResearchModal({ visible, onClose, onResearch, completedResearch, facilities, now, funds, onDemolish, demolishDisabled, labProcessing, actionDisabled }: Props) {
+export function ResearchModal({ visible, onClose, onResearch, completedResearch, facilities, now, funds, onDemolish, demolishDisabled, demolishCost, labProcessing, actionDisabled }: Props) {
   const [selectedKey, setSelectedKey] = useState<string>(RESEARCH_CATALOG[0].key);
   const selected = RESEARCH_CATALOG.find((e) => e.key === selectedKey) ?? RESEARCH_CATALOG[0];
 
@@ -63,6 +64,7 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
       }}
       onDemolish={onDemolish}
       demolishDisabled={demolishDisabled}
+      demolishCost={demolishCost}
       actionForceDisabled={labProcessing || selectedIsActive || actionDisabled}
     />
   );

@@ -386,7 +386,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
       }
     } else if (
       (currentFacility.state === 'idle' || currentFacility.state === 'stopped') &&
-      (currentFacility.kind === 'extractor' || currentFacility.kind === 'refinery')
+      (currentFacility.kind === 'extractor' || currentFacility.kind === 'refinery' || currentFacility.kind === 'subdivision')
     ) {
       setTimeout(() => setFacilityDetailVisible(true), 0);
     }
@@ -583,7 +583,9 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
           setFacilityDetailVisible(false);
           handleDemolish();
         }}
-        demolishDisabled={isReplay}
+        demolishDisabled={isReplay || (currentFacility ? game.player.funds < currentFacility.demolishCost : false)}
+        demolishCost={currentFacility?.demolishCost}
+        demolishLabel={currentFacility?.kind === 'subdivision' ? '買い上げ' : undefined}
       />
 
       {/* 研究モーダル */}
@@ -606,7 +608,8 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
         facilities={game.facilities}
         now={now}
         actionDisabled={isReplay}
-        demolishDisabled={isReplay}
+        demolishDisabled={isReplay || (currentFacility ? game.player.funds < currentFacility.demolishCost : false)}
+        demolishCost={currentFacility?.demolishCost}
       />
 
       {/* ゲームスタートオーバーレイ（通常モードのみ） */}
