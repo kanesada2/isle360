@@ -54,10 +54,10 @@ export function encodeLogs(logs: GameLogEntry[]): string {
 
 // ── デコード ──────────────────────────────────────────────────
 
-function decodeEntry(row: Row): GameLogEntry {
+function decodeEntry(row: Row): GameLogEntry | null {
   const [kindIdx, elapsedMs, score, fps, facIdx, researchKey, mapSeed, plotIndex, facilityKey] = row;
   const kind = KIND_LIST[kindIdx as number];
-  if (!kind) throw new Error(`Invalid kindIdx: ${kindIdx}`);
+  if (!kind) return null;
   const entry: GameLogEntry = {
     kind,
     elapsedMs: elapsedMs as number,
@@ -84,5 +84,5 @@ export function decodeLogs(token: string): GameLogEntry[] {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const json = pako.inflate(bytes, { to: 'string' });
   const rows: Row[] = JSON.parse(json);
-  return rows.map(decodeEntry);
+  return rows.map(decodeEntry).filter((e): e is GameLogEntry => e !== null);
 }
