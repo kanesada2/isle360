@@ -55,8 +55,10 @@ export function encodeLogs(logs: GameLogEntry[]): string {
 
 function decodeEntry(row: Row): GameLogEntry {
   const [kindIdx, elapsedMs, score, fps, facIdx, researchKey, mapSeed, plotIndex, facilityKey] = row;
+  const kind = KIND_LIST[kindIdx as number];
+  if (!kind) throw new Error(`Invalid kindIdx: ${kindIdx}`);
   const entry: GameLogEntry = {
-    kind: KIND_LIST[kindIdx as number],
+    kind,
     elapsedMs: elapsedMs as number,
     score: score as number,
     fundsPerSecond: fps as number,
@@ -67,7 +69,9 @@ function decodeEntry(row: Row): GameLogEntry {
   }
   if (typeof researchKey === 'string') entry.researchKey = researchKey;
   if (typeof mapSeed === 'number') entry.mapSeed = mapSeed;
-  if (typeof plotIndex === 'number') entry.plotIndex = plotIndex as PlotIndex;
+  if (typeof plotIndex === 'number' && plotIndex >= 0 && plotIndex <= 8) {
+    entry.plotIndex = plotIndex as PlotIndex;
+  }
   if (typeof facilityKey === 'string') entry.facilityKey = facilityKey;
   return entry;
 }

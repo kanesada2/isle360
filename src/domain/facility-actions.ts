@@ -197,6 +197,10 @@ export function buildFacility(
   entry: FacilityCatalogEntry,
   now: number,
 ): Game {
+  if (plotIndex < 0 || plotIndex >= game.plots.length) return game;
+  if (game.plots[plotIndex].facilityId !== null) return game;
+  if (entry.requiredResearchKey && !game.player.completedResearch.has(entry.requiredResearchKey)) return game;
+
   // Monument は同時に1基しか建設できない
   if (entry.kind === 'monument') {
     const alreadyBuilding = [...game.facilities.values()].some(
@@ -266,11 +270,13 @@ export function buildFacility(
 
 /** 指定 plot の施設を破壊開始する（state: demolishing） */
 export function demolishFacility(game: Game, plotIndex: PlotIndex, now: number): Game {
+  if (plotIndex < 0 || plotIndex >= game.plots.length) return game;
   const facilityId = game.plots[plotIndex].facilityId;
   if (!facilityId) return game;
 
   const facility = game.facilities.get(facilityId);
   if (!facility) return game;
+  if (facility.state !== 'idle') return game;
 
   const newFacilities = new Map(game.facilities);
   newFacilities.set(facilityId, {
