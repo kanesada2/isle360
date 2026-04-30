@@ -323,7 +323,7 @@ export function tickFacilities(game: Game, now: number): Game {
             // 建設完了時に建設マスの資源総量分の資金を即時付与
             const plot = newPlots[facility.plotIndex];
             const totalResources = plot.deposits.reduce((sum, d) => sum + d.current, 0);
-            newPlayer = { ...newPlayer, funds: Math.round((newPlayer.funds + Math.floor(totalResources)) * 100) / 100 };
+            newPlayer = { ...newPlayer, funds: Math.round((newPlayer.funds + Math.floor(totalResources / 2)) * 100) / 100 };
             newFacilities.set(id, { ...facility, state: 'idle' as const, currentJob: null, lastDrainAt: null } as Subdivision);
           } else {
             newFacilities.set(id, { ...facility, state: 'idle' as const, currentJob: null });

@@ -1111,9 +1111,9 @@ describe("Subdivision 建設", () => {
     expect(fac.kind).toBe("subdivision");
   });
 
-  it("BUILD_DURATION_MS 後に完了し、建設マスの資源総量分の資金を即時獲得する", () => {
+  it("BUILD_DURATION_MS 後に完了し、建設マスの資源総量の半分の資金を即時獲得する", () => {
     const game0 = makeGame(0);
-    // makeGame の plot 0: 農産1000 + 鉱物500 + エネルギー300 = 1800
+    // makeGame の plot 0: 農産1000 + 鉱物500 + エネルギー300 = 1800 → 900
     const plotTotalResources = game0.plots[0].deposits.reduce((s, d) => s + d.current, 0);
 
     let game = buildFacility(game0, 0, SUBDIVISION_ENTRY, NOW);
@@ -1122,7 +1122,7 @@ describe("Subdivision 建設", () => {
     const fac = [...game.facilities.values()][0];
     expect(fac.state).toBe("idle");
     expect(fac.kind).toBe("subdivision");
-    expect(game.player.funds).toBe(Math.floor(plotTotalResources));
+    expect(game.player.funds).toBe(Math.floor(plotTotalResources / 2));
   });
 
   it("建設マスのみ参照し、他マスの資源は含まない", () => {
@@ -1139,7 +1139,7 @@ describe("Subdivision 建設", () => {
     let game = buildFacility(game1, 0, SUBDIVISION_ENTRY, NOW);
     game = tickFacilities(game, NOW + BUILD_DURATION_MS);
 
-    expect(game.player.funds).toBe(Math.floor(plot0Total));
+    expect(game.player.funds).toBe(Math.floor(plot0Total / 2));
   });
 });
 

@@ -97,9 +97,9 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     key: "subdivision",
     kind: "subdivision",
     name: "開発区画",
-    description: "民間が使用できる区画。建設完了すると資源残存量に応じて資金を得られるが、買い戻すと割高。",
+    description: "民間が使用できる区画。建設完了すると資源残存量に応じて即座に資金を得られるが、買い戻すと割高。",
     buildCost: 0,
-    demolishCost: 2000
+    demolishCost: 1000
   },
   {
     key: "monument",
