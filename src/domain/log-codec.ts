@@ -14,7 +14,7 @@ const KIND_LIST: GameEventKind[] = [
 ];
 
 const FACILITY_KIND_LIST: (Facility['kind'] | null)[] = [
-  null, 'extractor', 'refinery', 'laboratory', 'monument',
+  null, 'extractor', 'refinery', 'laboratory', 'monument', 'subdivision',
 ];
 
 // ── エンコード ────────────────────────────────────────────────
