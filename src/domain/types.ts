@@ -8,7 +8,7 @@ export type ResearchId  = Brand<string, "ResearchId">;
 // ── Resource ─────────────────────────────────────────────────────
 export type ResourcePhase = 1 | 2 | 3;
 
-export type resourceGain = 1 | 2 | 4;
+export type resourceGain = 1 | 2 | 3;
 
 // Phase 1=農産 / Phase 2=鉱物 / Phase 3=エネルギー
 export type ResourceType = "agriculture" | "mineral" | "energy";

@@ -141,7 +141,7 @@ function buildDeposits(spec?: PlotDepositSpec) {
       abundance: agri?.abundance    ?? 0, current: agri?.current    ?? agri?.abundance    ?? 0, totalMined: 0 },
     { type: 'mineral'     as const, phase: 2 as const, gain: 2 as const,
       abundance: mineral?.abundance ?? 0, current: mineral?.current ?? mineral?.abundance ?? 0, totalMined: 0 },
-    { type: 'energy'      as const, phase: 3 as const, gain: 4 as const,
+    { type: 'energy'      as const, phase: 3 as const, gain: 3 as const,
       abundance: energy?.abundance  ?? 0, current: energy?.current  ?? energy?.abundance  ?? 0, totalMined: 0 },
   ];
 }

@@ -30,7 +30,7 @@ function generateDeposits(_index: PlotIndex, rng: Rng): ResourceDeposit[] {
   return [
     { type: "agriculture", phase: 1, gain: 1, abundance: agri,    current: agri,    totalMined: 0 },
     { type: "mineral",     phase: 2, gain: 2, abundance: mineral, current: mineral, totalMined: 0 },
-    { type: "energy",      phase: 3, gain: 4, abundance: energy,  current: energy,  totalMined: 0 },
+    { type: "energy",      phase: 3, gain: 3, abundance: energy,  current: energy,  totalMined: 0 },
   ];
 }
 

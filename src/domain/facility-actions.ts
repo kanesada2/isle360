@@ -109,7 +109,7 @@ function getConstructionMultiplier(completedResearch: Map<ResearchId, number>): 
 
 /**
  * 鉱物活用建築による建設コスト割引率を返す（0〜1）。
- * 割引率 = mineral_abundance × 0.0004 × 1.2^(alternativity-efficiency レベル)、上限1.0。
+ * 割引率 = mineral_abundance × 0.0005 × 1.2^(alternativity-efficiency レベル)、上限1.0。
  */
 export function getMineralBuildDiscountRate(
   plotIndex: PlotIndex,
