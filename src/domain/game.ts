@@ -15,6 +15,7 @@ export function createGame({ sessionDurationMs, initialFunds, mapSeed: seedParam
     funds: initialFunds,
     completedResearch: new Map(),
     activeResearchIds: new Set(),
+    builtFacilityKeys: new Set(),
     patentTickAt: null,
   };
 

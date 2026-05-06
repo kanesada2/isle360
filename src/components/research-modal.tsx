@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { CatalogModal } from '@/components/catalog-modal';
 import { getResearchCost } from '@/domain/facility-actions';
@@ -11,6 +11,7 @@ type Props = {
   onClose: () => void;
   onResearch: (entry: ResearchCatalogEntry) => void;
   completedResearch: Map<ResearchId, number>;
+  builtFacilityKeys: Set<string>;
   facilities: Map<FacilityId, Facility>;
   now: number;
   funds: number;
@@ -21,9 +22,13 @@ type Props = {
   actionDisabled?: boolean;
 };
 
-export function ResearchModal({ visible, onClose, onResearch, completedResearch, facilities, now, funds, onDemolish, demolishDisabled, demolishCost, labProcessing, actionDisabled }: Props) {
-  const [selectedKey, setSelectedKey] = useState<string>(RESEARCH_CATALOG[0].key);
-  const selected = RESEARCH_CATALOG.find((e) => e.key === selectedKey) ?? RESEARCH_CATALOG[0];
+export function ResearchModal({ visible, onClose, onResearch, completedResearch, builtFacilityKeys, facilities, now, funds, onDemolish, demolishDisabled, demolishCost, labProcessing, actionDisabled }: Props) {
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const selected = selectedKey ? (RESEARCH_CATALOG.find((e) => e.key === selectedKey) ?? null) : null;
+
+  useEffect(() => {
+    setSelectedKey(null);
+  }, [completedResearch]);
 
   const items = getAvailableResearch(completedResearch).map((e) => {
     const cost = getResearchCost(e, completedResearch);
@@ -38,15 +43,15 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
       key: e.key,
       name: e.repeatable ? `${e.name} Lv.${nextLevel}` : e.name,
       costLabel: e.repeatable ? `${cost.toLocaleString()} G〜` : `${cost.toLocaleString()} G`,
-      disabled: !isResearchAvailable(e, completedResearch, funds, facilities),
+      disabled: !isResearchAvailable(e, completedResearch, funds, facilities, builtFacilityKeys),
       special: e.special ?? false,
       progress,
     };
   });
 
-  const selectedIsActive = [...facilities.values()].some(
+  const selectedIsActive = selected ? [...facilities.values()].some(
     (f) => f.kind === 'laboratory' && f.state === 'processing' && f.activeResearchId === selected.key,
-  );
+  ) : false;
 
   return (
     <CatalogModal
@@ -55,10 +60,11 @@ export function ResearchModal({ visible, onClose, onResearch, completedResearch,
       items={items}
       selectedKey={selectedKey}
       onSelectKey={setSelectedKey}
-      descriptionTitle={selected.name}
-      descriptionText={selected.description}
-      actionLabel={`研究する（${getResearchCost(selected, completedResearch).toLocaleString()} G）`}
+      descriptionTitle={selected?.name ?? ''}
+      descriptionText={selected?.description ?? ''}
+      actionLabel={selected ? `研究する（${getResearchCost(selected, completedResearch).toLocaleString()} G）` : '研究する'}
       onAction={() => {
+        if (!selected) return;
         onResearch(selected);
         onClose();
       }}

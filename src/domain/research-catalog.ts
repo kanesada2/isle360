@@ -17,6 +17,8 @@ export type ResearchCatalogEntry = {
   special?: boolean;
   /** true の場合、前提研究が満たされるまでリストに表示しない */
   hideUntilAvailable?: boolean;
+  /** 研究開始に必要な施設カタログキーの一覧（いずれかが未建設なら開始不可） */
+  facilityPrerequisites?: string[];
 };
 
 export const MAX_RESEARCH_LEVEL = 5;
@@ -41,10 +43,11 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("agri-efficiency"),
     name: "農産物採集効率上昇",
     description:
-      "農場の採集速度が 20% 向上する。Lv.5まで繰り返し研究可能だが、コストは毎回 50% 増加する。",
+      "農場の採集速度が 20% 向上する。Lv.5まで繰り返し研究可能だが、コストは毎回 50% 増加する。農場の建設完了が前提。",
     baseCost: 100,
     repeatable: true,
     prerequisites: [],
+    facilityPrerequisites: ["extractor-agriculture"],
   },
   {
     key: r("agri-patent"),
@@ -70,10 +73,11 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("mineral-efficiency"),
     name: "鉱物採掘効率向上",
     description:
-      "鉱山の採掘速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。鉱物調査の完了が前提。",
+      "鉱山の採掘速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。鉱物調査の完了と鉱山の建設完了が前提。",
     baseCost: 200,
     repeatable: true,
     prerequisites: [{ key: r("mineral-survey"), level: 1 }],
+    facilityPrerequisites: ["extractor-mineral"],
   },
   {
     key: r("mineral-patent"),
@@ -99,10 +103,11 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("energy-efficiency"),
     name: "エネルギー獲得効率向上",
     description:
-      "エネルギー生産場の速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。エネルギー資源調査の完了が前提。",
+      "エネルギー生産場の速度が 20% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加。エネルギー資源調査の完了とエネルギー生産場の建設完了が前提。",
     baseCost: 300,
     repeatable: true,
     prerequisites: [{ key: r("energy-survey"), level: 1 }],
+    facilityPrerequisites: ["extractor-energy"],
   },
   {
     key: r("energy-patent"),
@@ -118,10 +123,11 @@ export const RESEARCH_CATALOG: readonly ResearchCatalogEntry[] = [
     key: r("refinery-efficiency"),
     name: "精製効率向上",
     description:
-      "精製工場によって高まる付加価値が 10% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。",
+      "精製工場によって高まる付加価値が 10% 向上する。Lv.5まで繰り返し研究可能だがコストは毎回 50% 増加する。精製工場の建設完了が前提。",
     baseCost: 100,
     repeatable: true,
     prerequisites: [],
+    facilityPrerequisites: ["refinery"],
   },
   {
     key: r("refinery-patent"),

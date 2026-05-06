@@ -56,24 +56,24 @@ describe('getAvailableResearch', () => {
 });
 
 describe('isResearchAvailable', () => {
+  const agriBuilt = new Set(['extractor-agriculture']);
+
   it('前提研究未完了なら false', () => {
-    const entry = getAvailableResearch(new Map()).find((e) => e.key === 'agri-efficiency')!;
-    // mineral-survey の前提は agri-efficiency
     const mineralSurveyEntry = { key: r('mineral-survey'), name: '', description: '', baseCost: 200, repeatable: false, prerequisites: [{ key: r('agri-efficiency'), level: 1 }] };
-    const result = isResearchAvailable(mineralSurveyEntry, new Map(), highFunds, noFacilities);
+    const result = isResearchAvailable(mineralSurveyEntry, new Map(), highFunds, noFacilities, new Set());
     expect(result).toBe(false);
   });
 
   it('前提研究完了済みなら true', () => {
     const completed = makeCompleted([['agri-efficiency', 1]]);
     const mineralSurveyEntry = { key: r('mineral-survey'), name: '', description: '', baseCost: 200, repeatable: false, prerequisites: [{ key: r('agri-efficiency'), level: 1 }] };
-    const result = isResearchAvailable(mineralSurveyEntry, completed, highFunds, noFacilities);
+    const result = isResearchAvailable(mineralSurveyEntry, completed, highFunds, noFacilities, new Set());
     expect(result).toBe(true);
   });
 
   it('資金不足なら false', () => {
     const entry = getAvailableResearch(new Map()).find((e) => e.key === 'agri-efficiency')!;
-    const result = isResearchAvailable(entry, new Map(), 50, noFacilities);
+    const result = isResearchAvailable(entry, new Map(), 50, noFacilities, agriBuilt);
     expect(result).toBe(false);
   });
 
@@ -87,7 +87,7 @@ describe('isResearchAvailable', () => {
         currentJob: { startedAt: 0, durationMs: 15_000 },
       } as any],
     ]);
-    const result = isResearchAvailable(entry, new Map(), highFunds, facilities);
+    const result = isResearchAvailable(entry, new Map(), highFunds, facilities, agriBuilt);
     expect(result).toBe(false);
   });
 
@@ -101,7 +101,25 @@ describe('isResearchAvailable', () => {
         currentJob: { startedAt: 0, durationMs: 15_000 },
       } as any],
     ]);
-    const result = isResearchAvailable(entry, new Map(), highFunds, facilities);
+    const result = isResearchAvailable(entry, new Map(), highFunds, facilities, agriBuilt);
     expect(result).toBe(true);
+  });
+
+  it('施設前提が未建設なら false', () => {
+    const entry = getAvailableResearch(new Map()).find((e) => e.key === 'agri-efficiency')!;
+    const result = isResearchAvailable(entry, new Map(), highFunds, noFacilities, new Set());
+    expect(result).toBe(false);
+  });
+
+  it('施設前提が建設済みなら通過する', () => {
+    const entry = getAvailableResearch(new Map()).find((e) => e.key === 'agri-efficiency')!;
+    const result = isResearchAvailable(entry, new Map(), highFunds, noFacilities, agriBuilt);
+    expect(result).toBe(true);
+  });
+
+  it('精製効率向上は精製工場が未建設なら false', () => {
+    const entry = getAvailableResearch(new Map()).find((e) => e.key === 'refinery-efficiency')!;
+    expect(isResearchAvailable(entry, new Map(), highFunds, noFacilities, new Set())).toBe(false);
+    expect(isResearchAvailable(entry, new Map(), highFunds, noFacilities, new Set(['refinery']))).toBe(true);
   });
 });

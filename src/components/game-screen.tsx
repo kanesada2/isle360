@@ -593,6 +593,7 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
         visible={labModalVisible}
         onClose={() => setLabModalVisible(false)}
         completedResearch={game.player.completedResearch}
+        builtFacilityKeys={game.player.builtFacilityKeys}
         funds={game.player.funds}
         onResearch={(entry: ResearchCatalogEntry) => {
           const facilityId = game.plots[selectedPlotIndex].facilityId;

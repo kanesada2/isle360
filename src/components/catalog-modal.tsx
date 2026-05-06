@@ -28,7 +28,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   items: CatalogModalItem[];
-  selectedKey: string;
+  selectedKey: string | null;
   onSelectKey: (key: string) => void;
   descriptionTitle: string;
   descriptionText: string;
@@ -64,7 +64,7 @@ export function CatalogModal({
   useEffect(() => { if (!visible) setConfirming(false); }, [visible]);
 
   const selectedItem = items.find((item) => item.key === selectedKey);
-  const actionDisabled = (selectedItem?.disabled ?? false) || actionForceDisabled;
+  const actionDisabled = !selectedKey || (selectedItem?.disabled ?? false) || actionForceDisabled;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

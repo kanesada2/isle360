@@ -12,8 +12,8 @@ import {
   tickFacilities,
 } from "../../src/domain/facility-actions";
 import { FACILITY_CATALOG } from "../../src/domain/facility-catalog";
-import { RESEARCH_CATALOG } from "../../src/domain/research-catalog";
-import { getAvailableFacilityKeys, getUnlockedPhases } from "../../src/domain/research-unlock";
+import { MAX_RESEARCH_LEVEL, RESEARCH_CATALOG } from "../../src/domain/research-catalog";
+import { getAvailableFacilityKeys, getAvailableResearch, getUnlockedPhases, isResearchAvailable } from "../../src/domain/research-unlock";
 import type { Game, GameId, PlayerId, Plot, ResearchId } from "../../src/domain/types";
 
 // ── ヘルパー ──────────────────────────────────────────────────
@@ -29,18 +29,19 @@ function research(...pairs: [string, number][]): Map<ResearchId, number> {
 function makeGame(
   funds = 10_000,
   completedResearch = new Map<ResearchId, number>(),
+  builtFacilityKeys = new Set<string>(),
 ): Game {
   const plots: Plot[] = Array.from({ length: 9 }, () => ({
     deposits: [
       { type: "agriculture" as const, phase: 1 as const, gain: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
       { type: "mineral" as const,     phase: 2 as const, gain: 2 as const, abundance: 500,  current: 500,  totalMined: 0 },
-      { type: "energy" as const,      phase: 3 as const, gain: 4 as const, abundance: 300,  current: 300,  totalMined: 0 },
+      { type: "energy" as const,      phase: 3 as const, gain: 3 as const, abundance: 300,  current: 300,  totalMined: 0 },
     ],
     facilityId: null,
   }));
   return {
     id: "g1" as GameId,
-    player: { id: "p1" as PlayerId, funds, completedResearch, activeResearchIds: new Set(), patentTickAt: null },
+    player: { id: "p1" as PlayerId, funds, completedResearch, activeResearchIds: new Set(), builtFacilityKeys, patentTickAt: null },
     plots,
     facilities: new Map(),
     mapSeed: 0,
@@ -49,6 +50,10 @@ function makeGame(
     status: "playing",
     logs: [],
   };
+}
+
+function withBuiltKeys(game: Game, ...keys: string[]): Game {
+  return { ...game, player: { ...game.player, builtFacilityKeys: new Set([...game.player.builtFacilityKeys, ...keys]) } };
 }
 
 // カタログエントリ
@@ -93,6 +98,43 @@ describe("buildFacility", () => {
     game = tickFacilities(game, NOW + BUILD_DURATION_MS - 1);
 
     expect([...game.facilities.values()][0].state).toBe("constructing");
+  });
+
+  it("Extractor 建設完了で builtFacilityKeys に施設カタログキーが追加される", () => {
+    let game = makeGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    expect(game.player.builtFacilityKeys.has("extractor-agriculture")).toBe(false);
+
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+    expect(game.player.builtFacilityKeys.has("extractor-agriculture")).toBe(true);
+  });
+
+  it("複数施設の建設完了で各キーが追加される", () => {
+    const REFINERY_ENTRY = FACILITY_CATALOG.find((e) => e.key === "refinery")!;
+    let game = makeGame();
+    game = buildFacility(game, 0, AGRI_ENTRY, NOW);
+    game = buildFacility(game, 1, REFINERY_ENTRY, NOW);
+    game = tickFacilities(game, NOW + BUILD_DURATION_MS);
+
+    expect(game.player.builtFacilityKeys.has("extractor-agriculture")).toBe(true);
+    expect(game.player.builtFacilityKeys.has("refinery")).toBe(true);
+  });
+
+  it("施設が建設されていないと対応する効率研究を開始できない", () => {
+    const { game: g0, labId, researchStart } = (function () {
+      let g = makeGame(10_000);
+      g = buildFacility(g, 0, LAB_ENTRY, NOW);
+      g = tickFacilities(g, NOW + BUILD_DURATION_MS);
+      return { game: g, labId: g.plots[0].facilityId!, researchStart: NOW + BUILD_DURATION_MS };
+    })();
+
+    // 農場未建設 → 研究開始不可
+    const before = startResearch(g0, labId, AGRI_RESEARCH, researchStart);
+    expect(before.facilities.get(labId)!.state).toBe("idle");
+
+    // 農場建設完了後 → 研究開始可能
+    const after = startResearch(withBuiltKeys(g0, "extractor-agriculture"), labId, AGRI_RESEARCH, researchStart);
+    expect(after.facilities.get(labId)!.state).toBe("processing");
   });
 });
 
@@ -286,12 +328,13 @@ describe("startResearch / 研究完了", () => {
 
   it("研究コストが引かれ Laboratory が processing 状態になる", () => {
     const { game: g0, labId, researchStart } = setupIdleLab();
-    const fundsBefore = g0.player.funds;
+    const game = withBuiltKeys(g0, "extractor-agriculture");
+    const fundsBefore = game.player.funds;
 
-    const game = startResearch(g0, labId, AGRI_RESEARCH, researchStart);
+    const result = startResearch(game, labId, AGRI_RESEARCH, researchStart);
 
-    expect(game.player.funds).toBe(fundsBefore - AGRI_RESEARCH.baseCost);
-    const lab = game.facilities.get(labId)!;
+    expect(result.player.funds).toBe(fundsBefore - AGRI_RESEARCH.baseCost);
+    const lab = result.facilities.get(labId)!;
     expect(lab.state).toBe("processing");
     expect(lab.kind === "laboratory" ? lab.activeResearchId : null).toBe(r("agri-efficiency"));
   });
@@ -299,16 +342,18 @@ describe("startResearch / 研究完了", () => {
   it("資金不足の場合は研究を開始しない", () => {
     // LAB_ENTRY.buildCost = 500 → 残り0
     const { game: g0, labId, researchStart } = setupIdleLab(500);
+    const game = withBuiltKeys(g0, "extractor-agriculture");
 
-    const game = startResearch(g0, labId, AGRI_RESEARCH, researchStart); // 100G 必要
+    const result = startResearch(game, labId, AGRI_RESEARCH, researchStart); // 100G 必要
 
-    expect(game.player.funds).toBe(0); // 変化なし
-    expect(game.facilities.get(labId)!.state).toBe("idle");
+    expect(result.player.funds).toBe(0); // 変化なし
+    expect(result.facilities.get(labId)!.state).toBe("idle");
   });
 
   it("RESEARCH_DURATION_MS 後のティックで研究レベルが1上がる", () => {
     const { game: g0, labId, researchStart } = setupIdleLab();
-    let game = startResearch(g0, labId, AGRI_RESEARCH, researchStart);
+    let game = withBuiltKeys(g0, "extractor-agriculture");
+    game = startResearch(game, labId, AGRI_RESEARCH, researchStart);
     game = tickFacilities(game, researchStart + RESEARCH_DURATION_MS);
 
     expect(game.player.completedResearch.get(r("agri-efficiency"))).toBe(1);
@@ -317,12 +362,96 @@ describe("startResearch / 研究完了", () => {
 
   it("同じ研究を繰り返すとレベルが累積される", () => {
     const { game: g0, labId, researchStart } = setupIdleLab(10_000);
-    let game = startResearch(g0, labId, AGRI_RESEARCH, researchStart);
+    let game = withBuiltKeys(g0, "extractor-agriculture");
+    game = startResearch(game, labId, AGRI_RESEARCH, researchStart);
     game = tickFacilities(game, researchStart + RESEARCH_DURATION_MS);
     game = startResearch(game, labId, AGRI_RESEARCH, researchStart + RESEARCH_DURATION_MS);
     game = tickFacilities(game, researchStart + RESEARCH_DURATION_MS * 2);
 
     expect(game.player.completedResearch.get(r("agri-efficiency"))).toBe(2);
+  });
+
+  it("繰り返し研究が MAX_RESEARCH_LEVEL に達している場合は研究を開始しない", () => {
+    const { game: g0, labId, researchStart } = setupIdleLab(100_000);
+    const cr = new Map<ResearchId, number>([[r("agri-efficiency"), MAX_RESEARCH_LEVEL]]);
+    const game = { ...g0, player: { ...g0.player, completedResearch: cr } };
+
+    const after = startResearch(game, labId, AGRI_RESEARCH, researchStart);
+
+    expect(after.player.funds).toBe(game.player.funds); // コスト引かれない
+    expect(after.facilities.get(labId)!.state).toBe("idle");
+  });
+
+  it("繰り返し研究が MAX_RESEARCH_LEVEL 未満（Lv.4）であれば研究を開始できる", () => {
+    const { game: g0, labId, researchStart } = setupIdleLab(100_000);
+    const cr = new Map<ResearchId, number>([[r("agri-efficiency"), MAX_RESEARCH_LEVEL - 1]]);
+    const game = withBuiltKeys({ ...g0, player: { ...g0.player, completedResearch: cr } }, "extractor-agriculture");
+
+    const after = startResearch(game, labId, AGRI_RESEARCH, researchStart);
+
+    expect(after.facilities.get(labId)!.state).toBe("processing");
+  });
+
+  it("非繰り返し研究が完了済みの場合は再研究を開始しない", () => {
+    const { game: g0, labId, researchStart } = setupIdleLab(100_000);
+    const crWithSurvey = new Map<ResearchId, number>([[r("mineral-survey"), 1], [r("agri-efficiency"), 1]]);
+    const gameWithSurvey = { ...g0, player: { ...g0.player, completedResearch: crWithSurvey } };
+
+    const afterSurvey = startResearch(gameWithSurvey, labId, MINERAL_SURVEY, researchStart);
+
+    expect(afterSurvey.player.funds).toBe(gameWithSurvey.player.funds);
+    expect(afterSurvey.facilities.get(labId)!.state).toBe("idle");
+  });
+});
+
+// ── getAvailableResearch / isResearchAvailable ────────────────
+
+describe("getAvailableResearch", () => {
+  it("繰り返し研究が MAX_RESEARCH_LEVEL 未満であればリストに含まれる", () => {
+    const cr = new Map<ResearchId, number>([[r("agri-efficiency"), MAX_RESEARCH_LEVEL - 1]]);
+    const list = getAvailableResearch(cr);
+    expect(list.some((e) => e.key === r("agri-efficiency"))).toBe(true);
+  });
+
+  it("繰り返し研究が MAX_RESEARCH_LEVEL に達するとリストから除外される", () => {
+    const cr = new Map<ResearchId, number>([[r("agri-efficiency"), MAX_RESEARCH_LEVEL]]);
+    const list = getAvailableResearch(cr);
+    expect(list.some((e) => e.key === r("agri-efficiency"))).toBe(false);
+  });
+
+  it("非繰り返し研究は未完了なら含まれ、完了済みなら除外される", () => {
+    const crBefore = new Map<ResearchId, number>([[r("agri-efficiency"), 1]]);
+    expect(getAvailableResearch(crBefore).some((e) => e.key === r("mineral-survey"))).toBe(true);
+
+    const crAfter = new Map<ResearchId, number>([[r("agri-efficiency"), 1], [r("mineral-survey"), 1]]);
+    expect(getAvailableResearch(crAfter).some((e) => e.key === r("mineral-survey"))).toBe(false);
+  });
+});
+
+describe("isResearchAvailable", () => {
+  const agriBuilt = new Set(["extractor-agriculture"]);
+
+  it("繰り返し研究が MAX_RESEARCH_LEVEL に達していれば false を返す", () => {
+    const cr = new Map<ResearchId, number>([[r("agri-efficiency"), MAX_RESEARCH_LEVEL]]);
+    expect(isResearchAvailable(AGRI_RESEARCH, cr, 100_000, new Map(), agriBuilt)).toBe(false);
+  });
+
+  it("繰り返し研究が MAX_RESEARCH_LEVEL 未満で資金・施設条件ありなら true を返す", () => {
+    const cr = new Map<ResearchId, number>([[r("agri-efficiency"), MAX_RESEARCH_LEVEL - 1]]);
+    expect(isResearchAvailable(AGRI_RESEARCH, cr, 100_000, new Map(), agriBuilt)).toBe(true);
+  });
+
+  it("非繰り返し研究が完了済みなら false を返す", () => {
+    const cr = new Map<ResearchId, number>([[r("agri-efficiency"), 1], [r("mineral-survey"), 1]]);
+    expect(isResearchAvailable(MINERAL_SURVEY, cr, 100_000, new Map(), new Set())).toBe(false);
+  });
+
+  it("施設前提が未建設なら false を返す", () => {
+    expect(isResearchAvailable(AGRI_RESEARCH, new Map(), 100_000, new Map(), new Set())).toBe(false);
+  });
+
+  it("施設前提が建設済みなら通過する", () => {
+    expect(isResearchAvailable(AGRI_RESEARCH, new Map(), 100_000, new Map(), agriBuilt)).toBe(true);
   });
 });
 
@@ -623,13 +752,13 @@ describe("鉱物活用建築", () => {
       deposits: [
         { type: "agriculture" as const, phase: 1 as const, gain: 1 as const, abundance: 1000, current: 1000, totalMined: 0 },
         { type: "mineral" as const,     phase: 2 as const, gain: 2 as const, abundance: i === 0 ? mineralAbundance : 500, current: i === 0 ? mineralAbundance : 500, totalMined: 0 },
-        { type: "energy" as const,      phase: 3 as const, gain: 4 as const, abundance: 300,  current: 300,  totalMined: 0 },
+        { type: "energy" as const,      phase: 3 as const, gain: 3 as const, abundance: 300,  current: 300,  totalMined: 0 },
       ],
       facilityId: null,
     }));
     return {
       id: "g1" as GameId,
-      player: { id: "p1" as PlayerId, funds, completedResearch, activeResearchIds: new Set(), patentTickAt: null },
+      player: { id: "p1" as PlayerId, funds, completedResearch, activeResearchIds: new Set(), builtFacilityKeys: new Set(), patentTickAt: null },
       plots,
       facilities: new Map(),
       mapSeed: 0,
@@ -855,6 +984,7 @@ describe("ゲームログ", () => {
     game = buildFacility(game, 0, LAB_ENTRY, NOW);
     game = tickFacilities(game, NOW + BUILD_DURATION_MS);
     const labId = game.plots[0].facilityId!;
+    game = withBuiltKeys(game, "extractor-agriculture");
     game = startResearch(game, labId, AGRI_RESEARCH, NOW + BUILD_DURATION_MS);
     const logsBefore = game.logs.length;
     game = tickFacilities(game, NOW + BUILD_DURATION_MS + RESEARCH_DURATION_MS);

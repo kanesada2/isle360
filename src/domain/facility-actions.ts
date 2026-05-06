@@ -1,7 +1,7 @@
 import type { FacilityCatalogEntry } from './facility-catalog';
 import { FACILITY_CATALOG, getActualBuildCost } from './facility-catalog';
 import { newFacilityId } from './id';
-import { RESEARCH_CATALOG, getResearchCost, type ResearchCatalogEntry } from './research-catalog';
+import { RESEARCH_CATALOG, MAX_RESEARCH_LEVEL, getResearchCost, type ResearchCatalogEntry } from './research-catalog';
 import type { Extractor, Facility, FacilityId, Game, GameLogEntry, Laboratory, Monument, Plot, PlotIndex, Refinery, ResearchId, ResourceType, Subdivision } from './types';
 export { getResearchCost } from './research-catalog';
 
@@ -46,6 +46,10 @@ export function startResearch(
 ): Game {
   const facility = game.facilities.get(facilityId);
   if (!facility || facility.kind !== 'laboratory' || facility.state !== 'idle') return game;
+
+  const currentLevel = game.player.completedResearch.get(entry.key as ResearchId) ?? 0;
+  if (entry.repeatable ? currentLevel >= MAX_RESEARCH_LEVEL : currentLevel > 0) return game;
+  if (entry.facilityPrerequisites?.some((k) => !game.player.builtFacilityKeys.has(k))) return game;
 
   const cost = getResearchCost(entry, game.player.completedResearch);
   if (game.player.funds < cost) return game;
@@ -316,6 +320,7 @@ export function tickFacilities(game: Game, now: number): Game {
   let newPlots: readonly Plot[] = game.plots;
   let newPlayer = game.player;
   const newActiveResearchIds = new Set(game.player.activeResearchIds);
+  const newlyBuiltKeys: string[] = [];
   const pendingEvents: Pick<GameLogEntry, 'kind' | 'facilityKind' | 'researchKey' | 'resourceType'>[] = [];
 
   for (const [id, facility] of game.facilities) {
@@ -336,6 +341,10 @@ export function tickFacilities(game: Game, now: number): Game {
           } else {
             newFacilities.set(id, { ...facility, state: 'idle' as const, currentJob: null });
           }
+          const catalogKey = facility.kind === 'extractor'
+            ? `extractor-${(facility as Extractor).resourceType}`
+            : facility.kind;
+          newlyBuiltKeys.push(catalogKey);
           pendingEvents.push({ kind: 'construction-complete', facilityKind: facility.kind });
           changed = true;
           continue; // 同フレームで採掘処理はしない
@@ -531,6 +540,12 @@ export function tickFacilities(game: Game, now: number): Game {
   }
 
   if (!changed) return game;
+
+  if (newlyBuiltKeys.length > 0) {
+    const builtKeys = new Set(newPlayer.builtFacilityKeys);
+    for (const k of newlyBuiltKeys) builtKeys.add(k);
+    newPlayer = { ...newPlayer, builtFacilityKeys: builtKeys };
+  }
 
   const nextGame = { ...game, player: { ...newPlayer, activeResearchIds: newActiveResearchIds }, facilities: newFacilities, plots: newPlots };
   if (pendingEvents.length === 0) return nextGame;

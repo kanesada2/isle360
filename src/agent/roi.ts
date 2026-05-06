@@ -179,7 +179,7 @@ const SKIP_RESEARCH_KEYS = new Set([
 export function isResearchAvailable(entry: ResearchCatalogEntry, game: Game): boolean {
   if (SKIP_RESEARCH_KEYS.has(entry.key as string)) return false;
   if (game.player.activeResearchIds.has(entry.key)) return false;
-  return domainIsResearchAvailable(entry, game.player.completedResearch, game.player.funds, game.facilities);
+  return domainIsResearchAvailable(entry, game.player.completedResearch, game.player.funds, game.facilities, game.player.builtFacilityKeys);
 }
 
 /**

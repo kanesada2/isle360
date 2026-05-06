@@ -89,6 +89,7 @@ export type Player = {
   funds:             number;
   completedResearch: Map<ResearchId, number>;  // researchId → 到達レベル
   activeResearchIds: Set<ResearchId>;          // 現在処理中の研究キー
+  builtFacilityKeys: Set<string>;             // 建設完了済み施設カタログキーの集合
   patentTickAt:      number | null;            // 特許収入の最終計算時刻（ms）
 };
 

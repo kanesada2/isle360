@@ -37,6 +37,7 @@ export function getAvailableResearch(
 /**
  * 指定した研究が実行可能かどうかを返す。
  * - 前提研究完了済み
+ * - 前提施設が建設完了済み
  * - 資金が足りている
  * - いずれかの研究所で同じ研究が進行中でない
  */
@@ -45,10 +46,12 @@ export function isResearchAvailable(
   completedResearch: Map<ResearchId, number>,
   funds: number,
   facilities: Map<FacilityId, Facility>,
+  builtFacilityKeys: Set<string>,
 ): boolean {
   const level = completedResearch.get(entry.key) ?? 0;
   if (entry.repeatable ? level >= MAX_RESEARCH_LEVEL : level > 0) return false;
   if (!entry.prerequisites.every((prereq) => (completedResearch.get(prereq.key) ?? 0) >= prereq.level)) return false;
+  if (entry.facilityPrerequisites?.some((k) => !builtFacilityKeys.has(k))) return false;
   if (getResearchCost(entry, completedResearch) > funds) return false;
   if ([...facilities.values()].some((f) => f.kind === 'laboratory' && f.state === 'processing' && f.activeResearchId === entry.key)) return false;
   return true;

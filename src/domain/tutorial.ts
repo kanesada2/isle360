@@ -153,6 +153,12 @@ function buildDeposits(spec?: PlotDepositSpec) {
  * - 指定の施設を事前建設済みとして配置
  */
 export function createTutorialGame(stage: TutorialStage): Game {
+  const preBuildIdleFacilityKeys = new Set(
+    (stage.plotSetups ?? [])
+      .filter(s => s.preBuildFacility && (s.preBuildFacility.state ?? 'idle') === 'idle')
+      .map(s => s.preBuildFacility!.facilityKey),
+  );
+
   const player: Player = {
     id: newPlayerId(),
     funds: stage.initialFunds ?? 1_000,
@@ -160,6 +166,7 @@ export function createTutorialGame(stage: TutorialStage): Game {
       (stage.initialResearch ?? []).map(({ researchKey, level }) => [researchKey, level]),
     ),
     activeResearchIds: new Set(),
+    builtFacilityKeys: preBuildIdleFacilityKeys,
     patentTickAt: null,
   };
 
