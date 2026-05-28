@@ -14,6 +14,8 @@ export type FacilityCatalogEntry = {
   buildDurationMs?: number;
   /** 建設に必要な研究カタログキー。未指定なら初期から建設可能 */
   requiredResearchKey?: ResearchId;
+  /** 施設イラスト画像ソース（require() の戻り値） */
+  illustrationSource?: number;
 };
 
 /** 割引率を適用した実際の建設コストを返す */
@@ -52,6 +54,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "農産資源を継続的に採集する施設。低コストで建設できる。",
     buildCost: 200,
     demolishCost: 50,
+    illustrationSource: require("../../assets/images/facilities/agri.png"),
   },
   {
     key: "extractor-mineral",
@@ -63,6 +66,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     buildCost: 400,
     demolishCost: 100,
     requiredResearchKey: r("mineral-survey"),
+    illustrationSource: require("../../assets/images/facilities/mine.png"),
   },
   {
     key: "extractor-energy",
@@ -74,6 +78,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     buildCost: 600,
     demolishCost: 150,
     requiredResearchKey: r("energy-survey"),
+    illustrationSource: require("../../assets/images/facilities/energy.png"),
   },
   {
     key: "refinery",
@@ -83,6 +88,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "採集された資源に付加価値を加えて売却価格を高める施設。",
     buildCost: 300,
     demolishCost: 70,
+    illustrationSource: require("../../assets/images/facilities/refinery.png"),
   },
   {
     key: "laboratory",
@@ -92,6 +98,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "新技術の研究を進める施設。複数建設すると研究を並列化・加速できる。",
     buildCost: 500,
     demolishCost: 120,
+    illustrationSource: require("../../assets/images/facilities/labo.png"),
   },
   {
     key: "subdivision",
@@ -99,7 +106,7 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
     name: "開発区画",
     description: "民間が使用できる区画。建設完了すると資源残存量に応じて即座に資金を得られるが、買い戻すと割高。",
     buildCost: 0,
-    demolishCost: 1000
+    demolishCost: 1000,
   },
   {
     key: "monument",
@@ -109,5 +116,6 @@ export const FACILITY_CATALOG: readonly FacilityCatalogEntry[] = [
       "島の繁栄を示す建造物。一つの建設が完了するまで、次を建設開始できない。スコアに大きく貢献する。",
     buildCost: 3000,
     demolishCost: 0,
+    illustrationSource: require("../../assets/images/facilities/monument.png"),
   },
 ] as const;

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Image, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,7 +33,7 @@ import {
   startResearch,
   tickFacilities,
 } from '@/domain/facility-actions';
-import type { FacilityCatalogEntry } from '@/domain/facility-catalog';
+import { FACILITY_CATALOG, type FacilityCatalogEntry } from '@/domain/facility-catalog';
 import { createGame } from '@/domain/game';
 import { encodeLogs } from '@/domain/log-codec';
 import { scoreFromLogs } from '@/domain/replay-simulator';
@@ -46,6 +46,18 @@ import { useGameLoop } from '@/hooks/use-game-loop';
 import { useMissions } from '@/hooks/use-missions';
 import { usePlotTriggers } from '@/hooks/use-plot-triggers';
 import { useSoundContext } from '@/sound';
+
+const MAP_IMAGES = [
+  require('../../assets/images/maps/map1.png'),
+  require('../../assets/images/maps/map2.png'),
+  require('../../assets/images/maps/map3.png'),
+  require('../../assets/images/maps/map4.png'),
+  require('../../assets/images/maps/map5.png'),
+  require('../../assets/images/maps/map6.png'),
+  require('../../assets/images/maps/map7.png'),
+  require('../../assets/images/maps/map8.png'),
+  require('../../assets/images/maps/map9.png'),
+] as const;
 
 const SESSION_DURATION_MS = 360_000;
 const INITIAL_FUNDS = 1_000;
@@ -362,6 +374,14 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
     return facilityId ? game.facilities.get(facilityId) : undefined;
   }, [game.plots, game.facilities, selectedPlotIndex]);
 
+  const facilityIllustrationSource = useMemo(() => {
+    if (!currentFacility) return undefined;
+    const entryKey = currentFacility.kind === 'extractor'
+      ? `extractor-${currentFacility.resourceType}`
+      : currentFacility.kind;
+    return FACILITY_CATALOG.find(e => e.key === entryKey)?.illustrationSource;
+  }, [currentFacility]);
+
   const facilityDetailRows = useMemo(
     () => currentFacility
       ? getFacilityDetailRows(currentFacility, game.plots, game.facilities, game.player.completedResearch)
@@ -462,9 +482,88 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
       {/* プロットマップ */}
       <GestureDetector gesture={composedGesture}>
         <View style={[styles.plotMap, { backgroundColor: colors.backgroundElement }]}>
-          <Text style={[styles.plotMapLabel, { color: colors.textSecondary }]}>
-            Plot #{selectedPlotIndex}
-          </Text>
+          {/* 施設イラスト表示エリア（3:1 比の上部） */}
+          <View style={styles.illustrationArea}>
+            <Image
+              source={MAP_IMAGES[selectedPlotIndex]}
+              style={styles.illustrationBg}
+              resizeMode="cover"
+            />
+            {facilityIllustrationSource != null && (
+              <Image
+                source={facilityIllustrationSource}
+                style={[
+                  styles.facilityIllustration,
+                  {
+                    opacity:
+                      currentFacility?.state === 'constructing' ||
+                      currentFacility?.state === 'stopped' ||
+                      currentFacility?.state === 'demolishing'
+                        ? 0.4
+                        : 1,
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+
+          {/* ミニマップセクション（3:1 比の下部） */}
+          <View style={styles.minimapSection}>
+            {/* 3×3 ミニマップ */}
+            <View style={styles.miniMap}>
+              {([0, 1, 2, 3, 4, 5, 6, 7, 8] as const).map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.miniMapCell,
+                    { backgroundColor: i === selectedPlotIndex ? colors.text : colors.backgroundSelected },
+                  ]}
+                />
+              ))}
+            </View>
+
+            {/* 施設情報 */}
+            {currentFacility ? (
+              <View style={styles.facilityInfo}>
+                <Text style={[styles.facilityName, { color: colors.text }]}>
+                  {getFacilityDisplayName(currentFacility)}
+                  {'  '}
+                  <Text style={{ color: colors.textSecondary }}>
+                    {currentFacility.state === 'constructing' && '建設中'}
+                    {currentFacility.state === 'demolishing' && '破壊中'}
+                    {currentFacility.state === 'idle' && '稼働中'}
+                    {currentFacility.state === 'stopped' && '停止中'}
+                    {currentFacility.state === 'processing' && '処理中'}
+                  </Text>
+                </Text>
+                {currentFacility.currentJob && (() => {
+                  const ratio = Math.min(
+                    1,
+                    (now - currentFacility.currentJob.startedAt) / currentFacility.currentJob.durationMs,
+                  );
+                  const isDemolish = currentFacility.state === 'demolishing';
+                  return (
+                    <View style={styles.facilityProgress}>
+                      <View style={[styles.facilityProgressTrack, { backgroundColor: colors.backgroundSelected }]}>
+                        <View
+                          style={[
+                            styles.facilityProgressFill,
+                            { width: `${ratio * 100}%`, backgroundColor: isDemolish ? '#F44336' : '#4CAF50' },
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.facilityProgressLabel, { color: colors.textSecondary }]}>
+                        {Math.round(ratio * 100)}%
+                      </Text>
+                    </View>
+                  );
+                })()}
+              </View>
+            ) : (
+              <Text style={[styles.facilityName, { color: colors.backgroundSelected }]}>施設なし</Text>
+            )}
+          </View>
 
           {/* リプレイ速度バッジ */}
           {isReplay && gameStarted && !gameFinished && (
@@ -490,60 +589,6 @@ export function GameScreen({ replayLogs, tutorialStage, onTutorialComplete, init
               <Text style={styles.gearButtonText}>⚙</Text>
             </View>
           </GestureDetector>
-
-          {/* 3×3 ミニマップ */}
-          <View style={styles.miniMap}>
-            {([0, 1, 2, 3, 4, 5, 6, 7, 8] as const).map((i) => (
-              <View
-                key={i}
-                style={[
-                  styles.miniMapCell,
-                  { backgroundColor: i === selectedPlotIndex ? colors.text : colors.backgroundSelected },
-                ]}
-              />
-            ))}
-          </View>
-
-          {/* 施設情報 */}
-          {currentFacility ? (
-            <View style={styles.facilityInfo}>
-              <Text style={[styles.facilityName, { color: colors.text }]}>
-                {getFacilityDisplayName(currentFacility)}
-                {'  '}
-                <Text style={{ color: colors.textSecondary }}>
-                  {currentFacility.state === 'constructing' && '建設中'}
-                  {currentFacility.state === 'demolishing' && '破壊中'}
-                  {currentFacility.state === 'idle' && '稼働中'}
-                  {currentFacility.state === 'stopped' && '停止中'}
-                  {currentFacility.state === 'processing' && '処理中'}
-                </Text>
-              </Text>
-              {currentFacility.currentJob && (() => {
-                const ratio = Math.min(
-                  1,
-                  (now - currentFacility.currentJob.startedAt) / currentFacility.currentJob.durationMs,
-                );
-                const isDemolish = currentFacility.state === 'demolishing';
-                return (
-                  <View style={styles.facilityProgress}>
-                    <View style={[styles.facilityProgressTrack, { backgroundColor: colors.backgroundSelected }]}>
-                      <View
-                        style={[
-                          styles.facilityProgressFill,
-                          { width: `${ratio * 100}%`, backgroundColor: isDemolish ? '#F44336' : '#4CAF50' },
-                        ]}
-                      />
-                    </View>
-                    <Text style={[styles.facilityProgressLabel, { color: colors.textSecondary }]}>
-                      {Math.round(ratio * 100)}%
-                    </Text>
-                  </View>
-                );
-              })()}
-            </View>
-          ) : (
-            <Text style={[styles.facilityName, { color: colors.backgroundSelected }]}>施設なし</Text>
-          )}
         </View>
       </GestureDetector>
 
@@ -681,12 +726,42 @@ const styles = StyleSheet.create({
   plotMap: {
     flex: 1,
     borderRadius: Spacing.two,
+    overflow: 'hidden',
+  },
+  illustrationArea: {
+    flexGrow: 3,
+    flexShrink: 1,
+    flexBasis: 0,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  illustrationBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  facilityIllustration: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  minimapSection: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minHeight: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.three,
-  },
-  plotMapLabel: {
-    fontSize: 20,
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
   },
   speedBadge: {
     position: 'absolute',
@@ -744,12 +819,11 @@ const styles = StyleSheet.create({
   },
   facilityInfo: {
     alignItems: 'center',
+    alignSelf: 'stretch',
     gap: Spacing.one,
-    width: '100%',
-    paddingHorizontal: Spacing.three,
   },
   facilityName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
   },
